@@ -1,0 +1,13 @@
+{
+  "name": "sems-student-education-management-system",
+  "version": "1.0.0",
+  "description": "SEMS (Student Education Management System) - React + Node.js/Express MVC + MongoDB",
+  "scripts": {
+    "server": "npm --prefix server start",
+    "server:dev": "npm --prefix server run dev",
+    "client": "npm --prefix client run dev",
+    "client:build": "npm --prefix client run build",
+    "seed": "npm --prefix server run seed"
+  },
+  "keywords": ["sems", "mvc", "education", "react", "express", "mongodb", "ai"]
+}
