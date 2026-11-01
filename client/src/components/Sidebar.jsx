@@ -25,6 +25,7 @@ export default function Sidebar({ role }) {
           { to: '/admin/users', label: 'Quản lý Tài khoản', icon: Users },
           { to: '/admin/academic', label: 'Môn & Khóa học', icon: BookOpen },
           { to: '/admin/classes', label: 'Quản lý Lớp & Lịch', icon: Calendar },
+          { to: '/admin/messages', label: 'Tin nhắn', icon: MessageCircle },
           { to: '/admin/reports', label: 'Báo cáo & Phân tích', icon: BarChart3 }
         ];
       case 'teacher':
@@ -34,6 +35,7 @@ export default function Sidebar({ role }) {
           { to: '/teacher/attendance', label: 'Điểm danh buổi học', icon: CheckSquare },
           { to: '/teacher/assignments', label: 'AI Assignment Studio', icon: Sparkles },
           { to: '/teacher/grading', label: 'Chấm điểm & Nhận xét', icon: ClipboardList },
+          { to: '/teacher/messages', label: 'Tin nhắn', icon: MessageCircle },
           { to: '/teacher/ai-chat', label: 'AI Trợ Giảng', icon: MessageCircle, isAI: true }
         ];
       case 'student':
@@ -43,13 +45,15 @@ export default function Sidebar({ role }) {
           { to: '/student/assignments', label: 'Nhiệm vụ & Bài tập', icon: FileText },
           { to: '/student/progress', label: 'Tiến độ & Năng lực', icon: BarChart3 },
           { to: '/student/certificates', label: 'Chứng nhận', icon: Award },
+          { to: '/student/messages', label: 'Tin nhắn', icon: MessageCircle },
           { to: '/student/ai-chat', label: 'AI Hỏi Bài', icon: MessageCircle, isAI: true }
         ];
       case 'parent':
         return [
           { to: '/parent', label: 'Tổng quan con', icon: LayoutDashboard, end: true },
           { to: '/parent/attendance', label: 'Theo dõi Điểm danh', icon: CheckSquare },
-          { to: '/parent/grades', label: 'Điểm số & Nhận xét', icon: FileText }
+          { to: '/parent/grades', label: 'Điểm số & Nhận xét', icon: FileText },
+          { to: '/parent/messages', label: 'Tin nhắn', icon: MessageCircle }
         ];
       default:
         return [];

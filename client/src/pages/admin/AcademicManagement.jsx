@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import Modal from '../../components/Modal';
-import { BookOpen, Plus, Layers, FileText, CheckCircle2, ChevronRight, Tag } from 'lucide-react';
+import { BookOpen, Plus, Layers, FileText, CheckCircle2, ChevronRight, Tag, Pencil, Trash2 } from 'lucide-react';
 
 export default function AcademicManagement() {
   const [subjects, setSubjects] = useState([]);
@@ -15,6 +15,8 @@ export default function AcademicManagement() {
   const [isSubjectModalOpen, setIsSubjectModalOpen] = useState(false);
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
   const [isLessonModalOpen, setIsLessonModalOpen] = useState(false);
+  const [isEditingCourse, setIsEditingCourse] = useState(false);
+  const [deletingCourse, setDeletingCourse] = useState(false);
 
   const [subjectForm, setSubjectForm] = useState({ name: '', description: '', level: 'Cơ bản - Nâng cao' });
   const [courseForm, setCourseForm] = useState({ subjectId: '', name: '', targetAudience: '', objective: '', durationHours: 36, expectedSessions: 12 });
@@ -24,7 +26,7 @@ export default function AcademicManagement() {
     fetchAcademicData();
   }, []);
 
-  const fetchAcademicData = async () => {
+  const fetchAcademicData = async (preferredCourseId = selectedCourse?._id) => {
     setLoading(true);
     try {
       const [subjRes, courseRes] = await Promise.all([
@@ -33,8 +35,14 @@ export default function AcademicManagement() {
       ]);
       setSubjects(subjRes.data || []);
       setCourses(courseRes.data || []);
-      if (courseRes.data?.length > 0) {
-        selectCourse(courseRes.data[0]);
+      const courseToSelect = courseRes.data?.find((course) => course._id === preferredCourseId)
+        || courseRes.data?.[0];
+      if (courseToSelect) {
+        selectCourse(courseToSelect);
+      } else {
+        setSelectedCourse(null);
+        setLessons([]);
+        setCurriculums([]);
       }
     } catch (err) {
       console.error(err);
@@ -71,11 +79,46 @@ export default function AcademicManagement() {
   const handleCreateCourse = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/academic/courses', courseForm);
+      let courseId = selectedCourse?._id;
+      if (isEditingCourse) {
+        await api.put(`/academic/courses/${selectedCourse._id}`, courseForm);
+      } else {
+        const response = await api.post('/academic/courses', courseForm);
+        courseId = response.data?._id;
+      }
       setIsCourseModalOpen(false);
-      fetchAcademicData();
+      fetchAcademicData(courseId);
     } catch (err) {
       alert(err.message);
+    }
+  };
+
+  const handleEditCourse = () => {
+    setCourseForm({
+      subjectId: selectedCourse.subjectId?._id || selectedCourse.subjectId || '',
+      name: selectedCourse.name || '',
+      targetAudience: selectedCourse.targetAudience || '',
+      objective: selectedCourse.objective || '',
+      durationHours: selectedCourse.durationHours || 0,
+      expectedSessions: selectedCourse.expectedSessions || 0
+    });
+    setIsEditingCourse(true);
+    setIsCourseModalOpen(true);
+  };
+
+  const handleDeleteCourse = async () => {
+    if (!window.confirm(`Bạn có chắc muốn xóa khóa học "${selectedCourse.name}"? Các bài học và chương trình thuộc khóa học sẽ bị xóa theo. Khóa học đang được lớp học hoặc bài tập sử dụng sẽ không thể xóa.`)) {
+      return;
+    }
+    setDeletingCourse(true);
+    try {
+      await api.delete(`/academic/courses/${selectedCourse._id}`);
+      setSelectedCourse(null);
+      await fetchAcademicData(null);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setDeletingCourse(false);
     }
   };
 
@@ -111,7 +154,11 @@ export default function AcademicManagement() {
             <Plus className="w-3.5 h-3.5" /> Thêm Môn Học
           </button>
           <button
-            onClick={() => setIsCourseModalOpen(true)}
+            onClick={() => {
+              setCourseForm({ subjectId: '', name: '', targetAudience: '', objective: '', durationHours: 36, expectedSessions: 12 });
+              setIsEditingCourse(false);
+              setIsCourseModalOpen(true);
+            }}
             className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5"
           >
             <Plus className="w-3.5 h-3.5" /> Mở Khóa Học
@@ -133,14 +180,22 @@ export default function AcademicManagement() {
               {courses.map((course) => {
                 const isSelected = selectedCourse?._id === course._id;
                 return (
-                  <button
+                  <div
                     key={course._id}
                     onClick={() => selectCourse(course)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        selectCourse(course);
+                      }
+                    }}
                     className={`w-full text-left p-3.5 rounded-xl border transition-all ${
-                      isSelected
-                        ? 'border-blue-500 bg-blue-50/50 shadow-xs ring-1 ring-blue-500'
-                        : 'border-slate-100 hover:border-slate-200 bg-white hover:bg-slate-50'
-                    }`}
+                    isSelected
+                      ? 'border-blue-500 bg-blue-50/50 shadow-xs ring-1 ring-blue-500'
+                      : 'border-slate-100 hover:border-slate-200 bg-white hover:bg-slate-50'
+                    } cursor-pointer`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-mono">
@@ -154,7 +209,7 @@ export default function AcademicManagement() {
                     <div className="text-[11px] text-slate-500 mt-0.5">
                       Môn: {course.subjectId?.name || 'Chung'}
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -167,23 +222,38 @@ export default function AcademicManagement() {
             <>
               {/* Course Info Card */}
               <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <span className="text-xs font-mono font-bold text-blue-600 uppercase bg-blue-50 px-2 py-0.5 rounded">
+                <div className="space-y-4">
+                  <div className="w-full min-w-0">
+                    <span className="block w-fit max-w-full break-all text-xs font-mono font-bold text-blue-600 uppercase bg-blue-50 px-2 py-1 rounded">
                       {selectedCourse.code}
                     </span>
-                    <h2 className="text-xl font-bold text-slate-800 mt-2">{selectedCourse.name}</h2>
+                    <h2 className="text-xl font-bold text-slate-800 mt-2 break-words">{selectedCourse.name}</h2>
                     <p className="text-xs text-slate-600 mt-1">{selectedCourse.objective}</p>
                   </div>
-                  <button
-                    onClick={() => {
-                      setLessonForm({ ...lessonForm, sessionNumber: lessons.length + 1 });
-                      setIsLessonModalOpen(true);
-                    }}
-                    className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 shrink-0"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Thêm Bài Học
-                  </button>
+                  <div className="flex flex-wrap justify-start sm:justify-end gap-2">
+                    <button
+                      onClick={handleEditCourse}
+                      className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5"
+                    >
+                      <Pencil className="w-3.5 h-3.5" /> Sửa khóa học
+                    </button>
+                    <button
+                      onClick={handleDeleteCourse}
+                      disabled={deletingCourse}
+                      className="px-3.5 py-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> {deletingCourse ? 'Đang xóa...' : 'Xóa'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setLessonForm({ ...lessonForm, sessionNumber: lessons.length + 1 });
+                        setIsLessonModalOpen(true);
+                      }}
+                      className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Thêm Bài Học
+                    </button>
+                  </div>
                 </div>
 
                 {/* Curriculum version info */}
@@ -298,7 +368,7 @@ export default function AcademicManagement() {
       </Modal>
 
       {/* Modal: Add Course */}
-      <Modal isOpen={isCourseModalOpen} onClose={() => setIsCourseModalOpen(false)} title="Mở Khóa Học Mới">
+      <Modal isOpen={isCourseModalOpen} onClose={() => setIsCourseModalOpen(false)} title={isEditingCourse ? 'Chỉnh Sửa Khóa Học' : 'Mở Khóa Học Mới'}>
         <form onSubmit={handleCreateCourse} className="space-y-4 text-xs">
           <div>
             <label className="block font-semibold text-slate-700 mb-1">Thuộc Môn Học *</label>
@@ -324,8 +394,18 @@ export default function AcademicManagement() {
             />
           </div>
           <div>
-            <p className="text-[11px] text-slate-500">Mã khóa học sẽ được hệ thống tự tạo khi lưu.</p>
+            <label className="block font-semibold text-slate-700 mb-1">Đối tượng học viên</label>
+            <input
+              type="text"
+              value={courseForm.targetAudience}
+              onChange={(e) => setCourseForm({ ...courseForm, targetAudience: e.target.value })}
+              className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs"
+              placeholder="VD: Người mới bắt đầu, học viên đã biết lập trình..."
+            />
           </div>
+          <p className="text-[11px] text-slate-500">
+            {isEditingCourse ? 'Mã khóa học được giữ nguyên khi chỉnh sửa.' : 'Mã khóa học sẽ được hệ thống tự tạo khi lưu.'}
+          </p>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Số buổi học</label>
@@ -358,7 +438,9 @@ export default function AcademicManagement() {
           </div>
           <div className="flex justify-end gap-2 pt-4 border-t">
             <button type="button" onClick={() => setIsCourseModalOpen(false)} className="px-4 py-2 border rounded-xl">Hủy</button>
-            <button type="submit" className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-xl">Tạo Khóa Học</button>
+            <button type="submit" className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-xl">
+              {isEditingCourse ? 'Lưu Thay Đổi' : 'Tạo Khóa Học'}
+            </button>
           </div>
         </form>
       </Modal>

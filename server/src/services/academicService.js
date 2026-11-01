@@ -1,4 +1,6 @@
 const { Subject, Course, Curriculum, Lesson } = require('../models/Academic');
+const { Class, ClassSession } = require('../models/Class');
+const Assignment = require('../models/Assignment');
 
 function createCodePrefix(prefix, name) {
   const slug = String(name || '')
@@ -80,7 +82,42 @@ class AcademicService {
   }
 
   async updateCourse(id, data) {
-    return await Course.findByIdAndUpdate(id, data, { new: true });
+    return await Course.findByIdAndUpdate(id, data, { new: true, runValidators: true })
+      .populate('subjectId', 'name code');
+  }
+
+  async deleteCourse(id) {
+    const course = await Course.findById(id);
+    if (!course) return null;
+
+    const linkedClass = await Class.exists({ courseId: id });
+    if (linkedClass) {
+      const error = new Error('Không thể xóa khóa học đang được sử dụng bởi lớp học. Hãy lưu trữ hoặc chỉnh sửa khóa học thay thế.');
+      error.statusCode = 409;
+      throw error;
+    }
+
+    const lessons = await Lesson.find({ courseId: id }).select('_id');
+    const lessonIds = lessons.map((lesson) => lesson._id);
+    if (lessonIds.length > 0) {
+      const linkedAssignment = await Assignment.exists({ lessonId: { $in: lessonIds } });
+      if (linkedAssignment) {
+        const error = new Error('Không thể xóa khóa học đang có bài tập tham chiếu đến bài học của khóa học.');
+        error.statusCode = 409;
+        throw error;
+      }
+      const linkedSession = await ClassSession.exists({ lessonId: { $in: lessonIds } });
+      if (linkedSession) {
+        const error = new Error('Không thể xóa khóa học đang có buổi học tham chiếu đến bài học của khóa học.');
+        error.statusCode = 409;
+        throw error;
+      }
+    }
+
+    await Lesson.deleteMany({ courseId: id });
+    await Curriculum.deleteMany({ courseId: id });
+    await Course.findByIdAndDelete(id);
+    return course;
   }
 
   // Curriculums

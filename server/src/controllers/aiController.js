@@ -31,7 +31,7 @@ class AIController {
         lessonId,
         topic,
         difficulty,
-        questionCount: Number(questionCount) || 4,
+        questionCount: Number(questionCount) || 20,
         questionType
       });
       return sendSuccess(res, draft, 'AI đã sinh bản nháp bài tập thành công');

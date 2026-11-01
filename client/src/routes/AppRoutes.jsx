@@ -40,6 +40,7 @@ import ParentGrades from '../pages/parent/ParentGrades';
 
 // Shared AI Chat
 import AIChat from '../pages/shared/AIChat';
+import MessageCenter from '../pages/shared/MessageCenter';
 
 export default function AppRoutes() {
   const { user } = useAuthStore();
@@ -55,6 +56,7 @@ export default function AppRoutes() {
         <Route path="academic" element={<AcademicManagement />} />
         <Route path="classes" element={<ClassManagement />} />
         <Route path="reports" element={<AnalyticsReport />} />
+        <Route path="messages" element={<MessageCenter />} />
       </Route>
 
       {/* Teacher routes */}
@@ -65,6 +67,7 @@ export default function AppRoutes() {
         <Route path="assignments" element={<AssignmentStudio />} />
         <Route path="grading" element={<GradingSubmissions />} />
         <Route path="ai-chat" element={<AIChat />} />
+        <Route path="messages" element={<MessageCenter />} />
       </Route>
 
       {/* Student routes */}
@@ -76,6 +79,7 @@ export default function AppRoutes() {
         <Route path="progress" element={<StudentProgress />} />
         <Route path="certificates" element={<StudentCertificates />} />
         <Route path="ai-chat" element={<AIChat />} />
+        <Route path="messages" element={<MessageCenter />} />
       </Route>
 
       {/* Parent routes */}
@@ -83,6 +87,7 @@ export default function AppRoutes() {
         <Route index element={<ParentDashboard />} />
         <Route path="attendance" element={<ParentAttendance />} />
         <Route path="grades" element={<ParentGrades />} />
+        <Route path="messages" element={<MessageCenter />} />
       </Route>
 
       {/* Default Catch-all */}

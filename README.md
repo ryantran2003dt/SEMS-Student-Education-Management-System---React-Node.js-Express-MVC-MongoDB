@@ -64,6 +64,7 @@ Hệ thống đã được nạp sẵn dữ liệu mẫu thực tế. Tại màn
 2. **Khớp Chuẩn Đầu Ra:** Hệ thống lấy đúng chuẩn kiến thức bài học đã được phê duyệt trong chương trình để sinh câu hỏi trắc nghiệm kèm đáp án và câu tự luận.
 3. **Kiểm Định Tiêu Chí:** Chấm điểm độ phù hợp của đề bài (0 - 100 điểm), kiểm tra phân bố độ khó và barem chấm điểm.
 4. **Giáo Viên Duyệt (Human-in-the-loop):** Đề bài luôn ở trạng thái `pending_review` (chờ duyệt). Giáo viên có toàn quyền kiểm tra, chỉnh sửa, bấm **Phê Duyệt** và **Xuất Bản** cho học viên. Học viên chỉ nhìn thấy bài tập khi giáo viên đã xuất bản.
+5. **Tin Nhắn Nội Bộ:** Giáo viên, học viên và phụ huynh trao đổi theo quan hệ lớp học đã xác minh; quản lý có thể nhắn với mọi tài khoản. Hỗ trợ tin nhắn chữ, sticker, ảnh và tệp học tập tối đa 20 MB; tin nhắn tự cập nhật khi hộp thư đang mở, còn tệp đính kèm chỉ người trong cuộc trò chuyện mới truy cập được.
 
 ---
 

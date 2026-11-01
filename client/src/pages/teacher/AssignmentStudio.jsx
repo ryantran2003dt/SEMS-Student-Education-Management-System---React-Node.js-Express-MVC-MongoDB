@@ -36,7 +36,7 @@ export default function AssignmentStudio() {
     lessonId: '',
     topic: 'Kiến trúc MVC và Thiết kế Cơ sở Dữ liệu',
     difficulty: 'Trung bình',
-    questionCount: 4,
+    questionCount: 20,
     questionType: 'multiple_choice'
   });
 
@@ -396,7 +396,7 @@ export default function AssignmentStudio() {
               <input
                 type="number"
                 min={2}
-                max={10}
+                max={20}
                 value={aiForm.questionCount}
                 onChange={(e) => setAiForm({ ...aiForm, questionCount: Number(e.target.value) })}
                 className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"

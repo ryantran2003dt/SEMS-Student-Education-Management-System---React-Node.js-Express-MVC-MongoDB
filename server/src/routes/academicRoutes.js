@@ -13,6 +13,8 @@ router.post('/subjects', authorize('admin'), academicController.createSubject);
 router.get('/courses', academicController.listCourses);
 router.post('/courses', authorize('admin'), academicController.createCourse);
 router.get('/courses/:id', academicController.getCourse);
+router.put('/courses/:id', authorize('admin'), academicController.updateCourse);
+router.delete('/courses/:id', authorize('admin'), academicController.deleteCourse);
 
 // Curriculums
 router.get('/courses/:courseId/curriculums', academicController.getCurriculums);

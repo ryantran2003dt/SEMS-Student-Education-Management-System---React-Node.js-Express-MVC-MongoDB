@@ -93,11 +93,14 @@ class AIService {
   /**
    * Gọi Gemini API, tự retry lỗi tạm thời và chuyển model khi quá tải.
    */
-  async callGeminiAPI({ prompt, apiKey, temperature = 0.7, isJson = true }) {
+  async callGeminiAPI({ prompt, apiKey, temperature = 0.7, isJson = true, maxOutputTokens }) {
     const body = {
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: { temperature }
     };
+    if (maxOutputTokens) {
+      body.generationConfig.maxOutputTokens = maxOutputTokens;
+    }
     if (isJson) {
       body.generationConfig.responseMimeType = 'application/json';
     }
@@ -121,9 +124,13 @@ class AIService {
     lessonId,
     topic,
     difficulty = 'Trung bình',
-    questionCount = 4,
+    questionCount = 20,
     questionType = 'multiple_choice',
   }) {
+    const requestedQuestionCount = Math.min(
+      Math.max(Math.floor(Number(questionCount) || 20), 2),
+      20
+    );
     let curriculumContext = '';
     let lessonTitle = topic || 'Bài tập rèn luyện kỹ năng';
 
@@ -148,12 +155,19 @@ class AIService {
         lessonTitle,
         curriculumContext,
         difficulty,
-        questionCount: Number(questionCount) || 4,
+        questionCount: requestedQuestionCount,
         questionType,
         apiKey
       });
       if (!geminiResult?.questions?.length) {
         const error = new Error('Google Gemini không trả về danh sách câu hỏi hợp lệ.');
+        error.statusCode = 502;
+        throw error;
+      }
+      if (geminiResult.questions.length !== requestedQuestionCount) {
+        const error = new Error(
+          `Google Gemini chỉ tạo ${geminiResult.questions.length}/${requestedQuestionCount} câu hỏi. Vui lòng thử sinh lại.`
+        );
         error.statusCode = 502;
         throw error;
       }
@@ -165,7 +179,7 @@ class AIService {
       topic: lessonTitle,
       curriculumContext,
       difficulty,
-      questionCount: Number(questionCount) || 4,
+      questionCount: requestedQuestionCount,
       questionType
     });
   }
@@ -214,7 +228,8 @@ Lưu ý:
       prompt,
       apiKey,
       temperature: 0.7,
-      isJson: true
+      isJson: true,
+      maxOutputTokens: 8192
     });
 
     return {
@@ -307,6 +322,186 @@ Lưu ý:
         points: 20,
         explanation: 'Phân tách trách nhiệm giúp chia nhỏ ứng dụng thành các lớp (Model, View, Controller, Service).',
         targetObjective: 'Tư duy kiến trúc phần mềm và module hóa'
+      },
+      {
+        questionText: `Khi kiểm thử một chức năng thuộc "${topic}", cách nào giúp phát hiện lỗi ở các trường hợp ít gặp?`,
+        type: 'multiple_choice',
+        options: [
+          'A. Kiểm thử dữ liệu biên, dữ liệu rỗng và dữ liệu không hợp lệ',
+          'B. Chỉ kiểm thử một lần với dữ liệu mẫu thông thường',
+          'C. Bỏ qua kiểm thử nếu giao diện hiển thị đúng',
+          'D. Chỉ kiểm thử trên máy của người phát triển'
+        ],
+        correctAnswer: 'A. Kiểm thử dữ liệu biên, dữ liệu rỗng và dữ liệu không hợp lệ',
+        points: 10,
+        explanation: 'Các trường hợp biên và dữ liệu không hợp lệ thường làm lộ lỗi xử lý mà dữ liệu thông thường không phát hiện được.',
+        targetObjective: 'Thiết kế kiểm thử và xử lý trường hợp biên'
+      },
+      {
+        questionText: `Vì sao cần kiểm tra dữ liệu đầu vào trước khi xử lý trong một ứng dụng liên quan đến "${topic}"?`,
+        type: 'multiple_choice',
+        options: [
+          'A. Để bảo đảm dữ liệu đúng định dạng, giảm lỗi và ngăn dữ liệu không hợp lệ đi vào hệ thống',
+          'B. Để mọi yêu cầu đều được chấp nhận nhanh hơn',
+          'C. Để không cần kiểm thử các chức năng khác',
+          'D. Để thay thế hoàn toàn việc phân quyền người dùng'
+        ],
+        correctAnswer: 'A. Để bảo đảm dữ liệu đúng định dạng, giảm lỗi và ngăn dữ liệu không hợp lệ đi vào hệ thống',
+        points: 10,
+        explanation: 'Kiểm tra đầu vào bảo vệ tính nhất quán của dữ liệu và giúp hệ thống phản hồi lỗi rõ ràng.',
+        targetObjective: 'Kiểm tra và bảo vệ dữ liệu đầu vào'
+      },
+      {
+        questionText: `Khi một giải pháp cho "${topic}" có nhiều phương án triển khai, tiêu chí nào nên được cân nhắc trước khi lựa chọn?`,
+        type: 'multiple_choice',
+        options: [
+          'A. Yêu cầu bài toán, tính đúng đắn, khả năng bảo trì và chi phí tài nguyên',
+          'B. Phương án có nhiều dòng mã nhất',
+          'C. Công nghệ mới nhất bất kể mức độ phù hợp',
+          'D. Phương án không cần tài liệu hoặc kiểm thử'
+        ],
+        correctAnswer: 'A. Yêu cầu bài toán, tính đúng đắn, khả năng bảo trì và chi phí tài nguyên',
+        points: 10,
+        explanation: 'Lựa chọn kỹ thuật cần dựa trên mục tiêu thực tế và các đánh đổi về độ tin cậy, bảo trì, hiệu năng.',
+        targetObjective: 'Phân tích yêu cầu và lựa chọn giải pháp'
+      },
+      {
+        questionText: `Hãy nêu một tình huống thực tế có thể áp dụng "${topic}", đề xuất hướng giải quyết và cách kiểm tra kết quả.`,
+        type: 'essay',
+        options: [],
+        correctAnswer: 'Bài làm cần nêu tình huống phù hợp, giải thích cách áp dụng kiến thức, trình bày các bước giải quyết và tiêu chí kiểm tra kết quả.',
+        points: 10,
+        explanation: 'Câu hỏi đánh giá khả năng liên hệ kiến thức với tình huống thực tế và lập luận có căn cứ.',
+        targetObjective: 'Vận dụng kiến thức vào tình huống thực tiễn'
+      },
+      {
+        questionText: `Nếu cần giải thích giải pháp của "${topic}" cho một thành viên mới trong nhóm, em sẽ trình bày những thành phần và lưu ý nào?`,
+        type: 'essay',
+        options: [],
+        correctAnswer: 'Bài làm cần mô tả các thành phần chính, vai trò của từng thành phần, luồng xử lý và một lưu ý về kiểm thử hoặc bảo trì.',
+        points: 10,
+        explanation: 'Trình bày rõ cấu trúc và luồng xử lý thể hiện mức độ hiểu bản chất của giải pháp.',
+        targetObjective: 'Giải thích cấu trúc và quy trình thực hiện'
+      },
+      {
+        questionText: `Trong quá trình triển khai "${topic}", tài liệu kỹ thuật có vai trò gì đối với nhóm phát triển?`,
+        type: 'multiple_choice',
+        options: [
+          'A. Giúp thống nhất cách sử dụng, quyết định thiết kế và quy trình bảo trì',
+          'B. Thay thế hoàn toàn việc trao đổi và kiểm thử',
+          'C. Chỉ làm tăng số lượng tệp mà không có giá trị',
+          'D. Bảo đảm chương trình không bao giờ phát sinh lỗi'
+        ],
+        correctAnswer: 'A. Giúp thống nhất cách sử dụng, quyết định thiết kế và quy trình bảo trì',
+        points: 10,
+        explanation: 'Tài liệu rõ ràng hỗ trợ phối hợp, tiếp nhận thành viên mới và duy trì hệ thống lâu dài.',
+        targetObjective: 'Ghi chép và phối hợp trong quá trình phát triển'
+      },
+      {
+        questionText: `Khi phát hiện kết quả xử lý "${topic}" không đúng mong đợi, bước đầu tiên hợp lý là gì?`,
+        type: 'multiple_choice',
+        options: [
+          'A. Tái hiện lỗi, kiểm tra đầu vào và lần theo các bước xử lý liên quan',
+          'B. Xóa toàn bộ dữ liệu và viết lại hệ thống ngay lập tức',
+          'C. Bỏ qua lỗi nếu chỉ có một người gặp phải',
+          'D. Thay đổi nhiều phần không liên quan cùng lúc'
+        ],
+        correctAnswer: 'A. Tái hiện lỗi, kiểm tra đầu vào và lần theo các bước xử lý liên quan',
+        points: 10,
+        explanation: 'Tái hiện lỗi và thu thập bằng chứng giúp xác định nguyên nhân trước khi chọn cách sửa.',
+        targetObjective: 'Phân tích lỗi có hệ thống'
+      },
+      {
+        questionText: `Cách nào giúp giảm nguy cơ một thay đổi trong "${topic}" làm hỏng chức năng đã hoạt động?`,
+        type: 'multiple_choice',
+        options: [
+          'A. Chạy lại các kiểm thử liên quan và kiểm thử hồi quy trước khi phát hành',
+          'B. Chỉ kiểm tra phần giao diện vừa chỉnh sửa',
+          'C. Bỏ qua các kiểm thử cũ vì mã nguồn đã thay đổi',
+          'D. Phát hành ngay để người dùng tự phát hiện lỗi'
+        ],
+        correctAnswer: 'A. Chạy lại các kiểm thử liên quan và kiểm thử hồi quy trước khi phát hành',
+        points: 10,
+        explanation: 'Kiểm thử hồi quy xác nhận thay đổi mới không làm suy giảm các chức năng hiện có.',
+        targetObjective: 'Kiểm soát chất lượng sau thay đổi'
+      },
+      {
+        questionText: `Khi lựa chọn dữ liệu để minh họa "${topic}", điều gì giúp ví dụ có giá trị học tập hơn?`,
+        type: 'multiple_choice',
+        options: [
+          'A. Dữ liệu thể hiện rõ yêu cầu, có trường hợp thông thường và trường hợp biên',
+          'B. Dữ liệu càng dài càng tốt dù không liên quan',
+          'C. Chỉ dùng dữ liệu luôn cho ra kết quả đúng',
+          'D. Dùng dữ liệu cá nhân thật mà không cần xin phép'
+        ],
+        correctAnswer: 'A. Dữ liệu thể hiện rõ yêu cầu, có trường hợp thông thường và trường hợp biên',
+        points: 10,
+        explanation: 'Ví dụ sát yêu cầu và có nhiều tình huống giúp người học hiểu cả cách dùng lẫn giới hạn.',
+        targetObjective: 'Lựa chọn ví dụ và dữ liệu kiểm thử phù hợp'
+      },
+      {
+        questionText: `Một giải pháp liên quan đến "${topic}" cần được cải tiến. Dựa vào đâu để xác định phần cần ưu tiên?`,
+        type: 'multiple_choice',
+        options: [
+          'A. Mục tiêu bài toán, phản hồi người dùng, số liệu vận hành và rủi ro',
+          'B. Sở thích cá nhân mà không cần kiểm chứng',
+          'C. Phần có tên tệp dài nhất',
+          'D. Thay đổi toàn bộ hệ thống cùng một lúc'
+        ],
+        correctAnswer: 'A. Mục tiêu bài toán, phản hồi người dùng, số liệu vận hành và rủi ro',
+        points: 10,
+        explanation: 'Ưu tiên dựa trên bằng chứng giúp tập trung vào cải tiến có tác động thực tế.',
+        targetObjective: 'Đánh giá và ưu tiên cải tiến'
+      },
+      {
+        questionText: `Hãy mô tả một lỗi có thể xảy ra khi áp dụng "${topic}", cách tái hiện lỗi và hướng khắc phục.`,
+        type: 'essay',
+        options: [],
+        correctAnswer: 'Bài làm cần mô tả triệu chứng, điều kiện tái hiện, nguyên nhân có thể, cách khắc phục và kiểm thử xác nhận.',
+        points: 10,
+        explanation: 'Quy trình mô tả, tái hiện và xác nhận lỗi thể hiện kỹ năng xử lý vấn đề thực tế.',
+        targetObjective: 'Chẩn đoán và khắc phục lỗi'
+      },
+      {
+        questionText: `Hãy đề xuất một bộ tiêu chí để đánh giá chất lượng của giải pháp áp dụng "${topic}".`,
+        type: 'essay',
+        options: [],
+        correctAnswer: 'Bài làm cần có tiêu chí phù hợp mục tiêu như tính đúng đắn, khả năng sử dụng, hiệu năng, bảo mật hoặc khả năng bảo trì; giải thích cách đo từng tiêu chí.',
+        points: 10,
+        explanation: 'Tiêu chí có thể đo lường giúp đánh giá giải pháp khách quan và định hướng cải tiến.',
+        targetObjective: 'Xây dựng tiêu chí đánh giá giải pháp'
+      },
+      {
+        questionText: `Nếu phải mở rộng giải pháp "${topic}" cho nhu cầu mới, em sẽ phân tích những yếu tố nào trước khi thay đổi thiết kế?`,
+        type: 'essay',
+        options: [],
+        correctAnswer: 'Bài làm cần xác định yêu cầu mới, ảnh hưởng đến thành phần hiện có, dữ liệu liên quan, rủi ro tương thích và kế hoạch kiểm thử.',
+        points: 10,
+        explanation: 'Phân tích ảnh hưởng trước khi mở rộng giúp hạn chế phá vỡ chức năng hiện tại.',
+        targetObjective: 'Phân tích khả năng mở rộng và tác động thay đổi'
+      },
+      {
+        questionText: `Hãy so sánh hai cách tiếp cận có thể dùng cho "${topic}" và nêu lý do chọn một cách cho tình huống cụ thể.`,
+        type: 'essay',
+        options: [],
+        correctAnswer: 'Bài làm cần nêu hai cách tiếp cận, so sánh ưu nhược điểm theo yêu cầu cụ thể và bảo vệ lựa chọn bằng lập luận.',
+        points: 10,
+        explanation: 'So sánh theo bối cảnh giúp đánh giá khả năng phân tích và lựa chọn giải pháp.',
+        targetObjective: 'So sánh và lựa chọn phương án triển khai'
+      },
+      {
+        questionText: `Khi xử lý dữ liệu trong "${topic}", cần lưu ý điều gì để hạn chế lộ thông tin nhạy cảm?`,
+        type: 'multiple_choice',
+        options: [
+          'A. Chỉ thu thập dữ liệu cần thiết, giới hạn quyền truy cập và tránh ghi dữ liệu nhạy cảm vào log',
+          'B. Công khai toàn bộ dữ liệu để mọi thành viên tiện theo dõi',
+          'C. Dùng chung một tài khoản có toàn quyền cho tất cả người dùng',
+          'D. Lưu thông tin nhạy cảm trực tiếp trong mã nguồn'
+        ],
+        correctAnswer: 'A. Chỉ thu thập dữ liệu cần thiết, giới hạn quyền truy cập và tránh ghi dữ liệu nhạy cảm vào log',
+        points: 10,
+        explanation: 'Giảm thiểu dữ liệu và giới hạn truy cập là các nguyên tắc cơ bản để bảo vệ thông tin.',
+        targetObjective: 'Nhận biết nguyên tắc bảo vệ dữ liệu'
       }
     ];
 

@@ -1,5 +1,5 @@
 const academicService = require('../services/academicService');
-const { sendSuccess } = require('../utils/response');
+const { sendSuccess, sendError } = require('../utils/response');
 
 class AcademicController {
   // Subjects
@@ -44,7 +44,42 @@ class AcademicController {
   async getCourse(req, res, next) {
     try {
       const course = await academicService.getCourseById(req.params.id);
+      if (!course) {
+        return sendError(res, 'Không tìm thấy khóa học', 404);
+      }
       return sendSuccess(res, course);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async updateCourse(req, res, next) {
+    try {
+      const { subjectId, name, targetAudience, objective, durationHours, expectedSessions } = req.body;
+      const course = await academicService.updateCourse(req.params.id, {
+        subjectId,
+        name,
+        targetAudience,
+        objective,
+        durationHours,
+        expectedSessions
+      });
+      if (!course) {
+        return sendError(res, 'Không tìm thấy khóa học', 404);
+      }
+      return sendSuccess(res, course, 'Cập nhật khóa học thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async deleteCourse(req, res, next) {
+    try {
+      const course = await academicService.deleteCourse(req.params.id);
+      if (!course) {
+        return sendError(res, 'Không tìm thấy khóa học', 404);
+      }
+      return sendSuccess(res, course, 'Xóa khóa học thành công');
     } catch (err) {
       next(err);
     }
