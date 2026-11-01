@@ -1,5 +1,41 @@
 const { Subject, Course, Curriculum, Lesson } = require('../models/Academic');
 
+function createCodePrefix(prefix, name) {
+  const slug = String(name || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[đĐ]/g, 'd')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 36)
+    .replace(/-$/g, '') || 'MOI';
+
+  return `${prefix}-${slug}`;
+}
+
+async function createWithGeneratedCode(Model, data, prefix) {
+  const codePrefix = createCodePrefix(prefix, data.name);
+  const codePattern = new RegExp(`^${codePrefix}-\\d+$`);
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const existingCodes = await Model.find({ code: codePattern }).distinct('code');
+    const nextNumber = existingCodes.reduce((max, code) => {
+      const suffix = Number(code.slice(codePrefix.length + 1));
+      return Number.isInteger(suffix) ? Math.max(max, suffix) : max;
+    }, 0) + 1;
+    const code = `${codePrefix}-${String(nextNumber).padStart(3, '0')}`;
+
+    try {
+      return await Model.create({ ...data, code });
+    } catch (err) {
+      if (err.code !== 11000 || attempt === 4) {
+        throw err;
+      }
+    }
+  }
+}
+
 class AcademicService {
   // Subjects
   async listSubjects() {
@@ -7,8 +43,7 @@ class AcademicService {
   }
 
   async createSubject(data) {
-    const subject = new Subject(data);
-    return await subject.save();
+    return createWithGeneratedCode(Subject, data, 'MON');
   }
 
   async updateSubject(id, data) {
@@ -27,8 +62,7 @@ class AcademicService {
   }
 
   async createCourse(data) {
-    const course = new Course(data);
-    const saved = await course.save();
+    const saved = await createWithGeneratedCode(Course, data, 'KHOA');
 
     // Automatically create version 1.0 curriculum
     await Curriculum.create({

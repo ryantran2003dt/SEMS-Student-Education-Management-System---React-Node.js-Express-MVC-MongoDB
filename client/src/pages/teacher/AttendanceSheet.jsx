@@ -122,17 +122,17 @@ export default function AttendanceSheet() {
             Ghi nhận chuyên cần: Có mặt, Đi trễ, Vắng có phép, Vắng không phép theo từng buổi.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
           <button
             onClick={setAllPresent}
-            className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold"
+            className="w-full sm:w-auto px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold"
           >
             Đánh dấu tất cả Có mặt
           </button>
           <button
             onClick={handleSaveAttendance}
             disabled={saving}
-            className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 disabled:opacity-50"
+            className="w-full sm:w-auto justify-center px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 disabled:opacity-50"
           >
             <Save className="w-4 h-4" /> {saving ? 'Đang lưu...' : 'Lưu Điểm Danh'}
           </button>
@@ -147,23 +147,23 @@ export default function AttendanceSheet() {
 
       {/* Selector bar */}
       <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-wrap gap-4 items-center">
-        <div>
+        <div className="w-full min-w-0 sm:w-auto">
           <label className="block text-[11px] font-bold text-slate-400 uppercase mb-1">Chọn Lớp</label>
           <select
             value={selectedClassId}
             onChange={(e) => handleSelectClass(e.target.value)}
-            className="text-xs font-semibold px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 min-w-48"
+            className="w-full min-w-0 sm:w-auto sm:min-w-48 text-xs font-semibold px-3 py-2 rounded-xl border border-slate-200 bg-slate-50"
           >
             {classes.map(c => <option key={c._id} value={c._id}>{c.name} ({c.code})</option>)}
           </select>
         </div>
 
-        <div>
+        <div className="w-full min-w-0 sm:w-auto">
           <label className="block text-[11px] font-bold text-slate-400 uppercase mb-1">Chọn Buổi Học</label>
           <select
             value={selectedSessionId}
             onChange={(e) => handleSelectSession(e.target.value)}
-            className="text-xs font-semibold px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 min-w-64"
+            className="w-full min-w-0 sm:w-auto sm:min-w-64 text-xs font-semibold px-3 py-2 rounded-xl border border-slate-200 bg-slate-50"
           >
             {classDetail?.sessions?.map(s => (
               <option key={s._id} value={s._id}>
@@ -176,7 +176,8 @@ export default function AttendanceSheet() {
 
       {/* Attendance Table */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <table className="w-full text-left border-collapse text-xs">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[680px] text-left border-collapse text-xs">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
               <th className="py-3.5 px-4">Học Viên</th>
@@ -268,6 +269,7 @@ export default function AttendanceSheet() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

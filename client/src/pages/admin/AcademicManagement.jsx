@@ -16,8 +16,8 @@ export default function AcademicManagement() {
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
   const [isLessonModalOpen, setIsLessonModalOpen] = useState(false);
 
-  const [subjectForm, setSubjectForm] = useState({ name: '', code: '', description: '', level: 'Cơ bản - Nâng cao' });
-  const [courseForm, setCourseForm] = useState({ subjectId: '', name: '', code: '', targetAudience: '', objective: '', durationHours: 36, expectedSessions: 12 });
+  const [subjectForm, setSubjectForm] = useState({ name: '', description: '', level: 'Cơ bản - Nâng cao' });
+  const [courseForm, setCourseForm] = useState({ subjectId: '', name: '', targetAudience: '', objective: '', durationHours: 36, expectedSessions: 12 });
   const [lessonForm, setLessonForm] = useState({ title: '', topic: '', sessionNumber: 1, objectives: '' });
 
   useEffect(() => {
@@ -267,28 +267,18 @@ export default function AcademicManagement() {
               placeholder="VD: Lập trình Python & Phân tích Dữ liệu"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Mã môn học *</label>
-              <input
-                type="text"
-                required
-                value={subjectForm.code}
-                onChange={(e) => setSubjectForm({ ...subjectForm, code: e.target.value.toUpperCase() })}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono uppercase"
-                placeholder="PYTHON-DS"
-              />
-            </div>
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Cấp độ</label>
-              <input
-                type="text"
-                value={subjectForm.level}
-                onChange={(e) => setSubjectForm({ ...subjectForm, level: e.target.value })}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs"
-                placeholder="Cơ bản - Nâng cao"
-              />
-            </div>
+          <div>
+            <p className="text-[11px] text-slate-500">Mã môn học sẽ được hệ thống tự tạo khi lưu.</p>
+          </div>
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1">Cấp độ</label>
+            <input
+              type="text"
+              value={subjectForm.level}
+              onChange={(e) => setSubjectForm({ ...subjectForm, level: e.target.value })}
+              className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs"
+              placeholder="Cơ bản - Nâng cao"
+            />
           </div>
           <div>
             <label className="block font-semibold text-slate-700 mb-1">Mô tả tổng quát</label>
@@ -333,18 +323,10 @@ export default function AcademicManagement() {
               placeholder="VD: Fullstack React & Node.js Chuyên Sâu"
             />
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Mã khóa *</label>
-              <input
-                type="text"
-                required
-                value={courseForm.code}
-                onChange={(e) => setCourseForm({ ...courseForm, code: e.target.value.toUpperCase() })}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono uppercase"
-                placeholder="FS-REACT-01"
-              />
-            </div>
+          <div>
+            <p className="text-[11px] text-slate-500">Mã khóa học sẽ được hệ thống tự tạo khi lưu.</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Số buổi học</label>
               <input
@@ -384,7 +366,7 @@ export default function AcademicManagement() {
       {/* Modal: Add Lesson */}
       <Modal isOpen={isLessonModalOpen} onClose={() => setIsLessonModalOpen(false)} title={`Thêm Bài Học - ${selectedCourse?.name}`}>
         <form onSubmit={handleCreateLesson} className="space-y-4 text-xs">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Buổi số *</label>
               <input
@@ -395,7 +377,7 @@ export default function AcademicManagement() {
                 className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs"
               />
             </div>
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <label className="block font-semibold text-slate-700 mb-1">Chủ đề (Topic) *</label>
               <input
                 type="text"

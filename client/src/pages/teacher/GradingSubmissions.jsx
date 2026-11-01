@@ -13,7 +13,9 @@ import {
   Download,
   Sparkles,
   Bot,
-  Check
+  Check,
+  LoaderCircle,
+  Users
 } from 'lucide-react';
 
 export default function GradingSubmissions() {
@@ -21,6 +23,10 @@ export default function GradingSubmissions() {
   const [selectedAssId, setSelectedAssId] = useState('');
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [bulkGrading, setBulkGrading] = useState(null);
+  const pendingSubmissions = submissions.filter(
+    (submission) => submission.status === 'submitted' || submission.status === 'resubmit_requested'
+  );
 
   // Grading Modal
   const [activeSubmission, setActiveSubmission] = useState(null);
@@ -55,6 +61,7 @@ export default function GradingSubmissions() {
 
   const handleSelectAssignment = async (assignmentId) => {
     setSelectedAssId(assignmentId);
+    setBulkGrading(null);
     try {
       const res = await api.get(`/submissions/assignments/${assignmentId}`);
       setSubmissions(res.data || []);
@@ -91,6 +98,72 @@ export default function GradingSubmissions() {
     } finally {
       setAiGradingLoading(false);
     }
+  };
+
+  const handleBulkAIGrade = async () => {
+    if (!pendingSubmissions.length || bulkGrading?.active) return;
+
+    const confirmed = window.confirm(
+      `AI sẽ chấm, tự động lưu điểm và gửi nhận xét cho ${pendingSubmissions.length} học viên chưa được chấm trong bài tập này. Bạn có muốn tiếp tục không?`
+    );
+    if (!confirmed) return;
+
+    setBulkGrading({
+      active: true,
+      completed: 0,
+      total: pendingSubmissions.length,
+      results: []
+    });
+
+    const concurrency = 2;
+    for (let index = 0; index < pendingSubmissions.length; index += concurrency) {
+      const batch = pendingSubmissions.slice(index, index + concurrency);
+      const batchResults = await Promise.all(batch.map(async (submission) => {
+        try {
+          const aiResponse = await api.post(`/ai/grade-submission/${submission._id}`);
+          const grade = aiResponse.data;
+          if (typeof grade?.score !== 'number' || !Number.isFinite(grade.score)) {
+            throw new Error('AI không trả về điểm số hợp lệ');
+          }
+
+          await api.post(`/submissions/${submission._id}/grade`, {
+            score: Math.max(0, Math.min(100, grade.score)),
+            feedback: grade.feedback || '',
+            answersFeedback: grade.answersFeedback || []
+          });
+
+          setSubmissions((current) => current.map((item) => item._id === submission._id
+            ? {
+                ...item,
+                status: 'graded',
+                score: Math.max(0, Math.min(100, grade.score)),
+                feedback: grade.feedback || ''
+              }
+            : item
+          ));
+
+          return {
+            studentName: submission.studentId?.fullName || 'Học viên',
+            score: Math.max(0, Math.min(100, grade.score)),
+            success: true
+          };
+        } catch (err) {
+          return {
+            studentName: submission.studentId?.fullName || 'Học viên',
+            error: err.message || 'Không thể chấm bài này',
+            success: false
+          };
+        }
+      }));
+
+      setBulkGrading((current) => ({
+        ...current,
+        completed: current.completed + batchResults.length,
+        results: [...current.results, ...batchResults]
+      }));
+    }
+
+    setBulkGrading((current) => ({ ...current, active: false }));
   };
 
   const handleSaveGrade = async (e) => {
@@ -142,12 +215,13 @@ export default function GradingSubmissions() {
       </div>
 
       {/* Assignment selector */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex items-center gap-3">
+      <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center gap-3">
         <label className="text-xs font-bold text-slate-500 uppercase">Chọn Bài Tập:</label>
         <select
           value={selectedAssId}
           onChange={(e) => handleSelectAssignment(e.target.value)}
-          className="text-xs font-semibold px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 min-w-80"
+          disabled={bulkGrading?.active}
+          className="w-full min-w-0 sm:min-w-80 sm:w-auto text-xs font-semibold px-3 py-2 rounded-xl border border-slate-200 bg-slate-50"
         >
           {assignments.map(a => (
             <option key={a._id} value={a._id}>
@@ -157,15 +231,80 @@ export default function GradingSubmissions() {
         </select>
       </div>
 
+      {bulkGrading && (
+        <section
+          aria-live="polite"
+          className="rounded-2xl border border-indigo-200 bg-indigo-50/70 p-4 space-y-3"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="flex items-center gap-2 text-sm font-bold text-indigo-900">
+              {bulkGrading.active
+                ? <LoaderCircle className="w-4 h-4 animate-spin" />
+                : <Check className="w-4 h-4 text-emerald-600" />}
+              <span>
+                {bulkGrading.active
+                  ? `Đang chấm bài bằng AI: ${bulkGrading.completed}/${bulkGrading.total}`
+                  : `Đã xử lý ${bulkGrading.completed}/${bulkGrading.total} bài nộp`}
+              </span>
+            </div>
+            {!bulkGrading.active && (
+              <span className="text-xs text-slate-600">
+                Thành công: {bulkGrading.results.filter((result) => result.success).length}
+                {' • '}
+                Lỗi: {bulkGrading.results.filter((result) => !result.success).length}
+              </span>
+            )}
+          </div>
+          <div
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={bulkGrading.total}
+            aria-valuenow={bulkGrading.completed}
+            className="h-2 overflow-hidden rounded-full bg-indigo-100"
+          >
+            <div
+              className="h-full rounded-full bg-indigo-600 transition-all"
+              style={{ width: `${(bulkGrading.completed / bulkGrading.total) * 100}%` }}
+            />
+          </div>
+          {!bulkGrading.active && bulkGrading.results.some((result) => !result.success) && (
+            <ul className="max-h-40 overflow-y-auto space-y-1 text-xs text-rose-700">
+              {bulkGrading.results.filter((result) => !result.success).map((result, index) => (
+                <li key={`${result.studentName}-${index}`}>
+                  {result.studentName}: {result.error}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
       {/* Submissions Table */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+        <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h2 className="text-sm font-bold text-slate-800">
             Danh Sách Bài Nộp ({submissions.length})
           </h2>
+          <button
+            type="button"
+            onClick={handleBulkAIGrade}
+            disabled={
+              bulkGrading?.active ||
+              !pendingSubmissions.length
+            }
+            className="w-full sm:w-auto justify-center px-3.5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-semibold flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {bulkGrading?.active
+              ? <LoaderCircle className="w-4 h-4 animate-spin" />
+              : <Users className="w-4 h-4" />}
+            {bulkGrading?.active
+              ? 'Đang chấm tất cả...'
+              : `AI chấm tất cả bài chưa chấm (${pendingSubmissions.length})`}
+          </button>
         </div>
 
-        <table className="w-full text-left border-collapse text-xs">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[680px] text-left border-collapse text-xs">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
               <th className="py-3 px-4">Học Viên</th>
@@ -219,6 +358,7 @@ export default function GradingSubmissions() {
                   <td className="py-3 px-4 text-right">
                     <button
                       onClick={() => openGradingModal(sub)}
+                      disabled={bulkGrading?.active}
                       className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[11px] transition-colors cursor-pointer"
                     >
                       {sub.status === 'graded' ? 'Xem & Chấm lại' : 'Chấm điểm'}
@@ -229,6 +369,7 @@ export default function GradingSubmissions() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Modal: Grade Submission */}
@@ -332,7 +473,7 @@ export default function GradingSubmissions() {
             </div>
 
             {/* Score & Feedback Inputs */}
-            <div className="grid grid-cols-3 gap-3 pt-3 border-t border-slate-100">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-100">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Điểm số (Thang 100) *</label>
                 <input
@@ -345,7 +486,7 @@ export default function GradingSubmissions() {
                   className="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold text-sm text-blue-600 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
               </div>
-              <div className="col-span-2">
+              <div className="sm:col-span-2">
                 <label className="block font-semibold text-slate-700 mb-1">Nhận xét của Giáo viên</label>
                 <textarea
                   rows={2}

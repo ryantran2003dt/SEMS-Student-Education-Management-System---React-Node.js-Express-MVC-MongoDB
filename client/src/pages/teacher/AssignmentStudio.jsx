@@ -15,10 +15,7 @@ import {
   CheckCircle2,
   Layers,
   FileQuestion,
-  Key,
-  Bot,
-  ExternalLink,
-  Settings2
+  Bot
 } from 'lucide-react';
 
 export default function AssignmentStudio() {
@@ -33,9 +30,6 @@ export default function AssignmentStudio() {
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiStatus, setAiStatus] = useState(null);
-  const [isAiConfigOpen, setIsAiConfigOpen] = useState(false);
-  const [configKeyInput, setConfigKeyInput] = useState('');
-  const [configKeyLoading, setConfigKeyLoading] = useState(false);
 
   const [aiForm, setAiForm] = useState({
     classId: '',
@@ -43,8 +37,7 @@ export default function AssignmentStudio() {
     topic: 'Kiến trúc MVC và Thiết kế Cơ sở Dữ liệu',
     difficulty: 'Trung bình',
     questionCount: 4,
-    questionType: 'multiple_choice',
-    apiKey: ''
+    questionType: 'multiple_choice'
   });
 
   // Review / Edit modal
@@ -103,21 +96,6 @@ export default function AssignmentStudio() {
       }
     } catch (err) {
       console.error(err);
-    }
-  };
-
-  const handleSaveApiKey = async (e) => {
-    e.preventDefault();
-    setConfigKeyLoading(true);
-    try {
-      const res = await api.post('/ai/config-key', { apiKey: configKeyInput });
-      setAiStatus(res.data);
-      setIsAiConfigOpen(false);
-      alert('Đã cập nhật cấu hình AI thành công!');
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setConfigKeyLoading(false);
     }
   };
 
@@ -235,14 +213,6 @@ export default function AssignmentStudio() {
         </div>
         <div className="flex items-center gap-2.5">
           <button
-            onClick={() => setIsAiConfigOpen(true)}
-            className="px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-xs flex items-center gap-2 cursor-pointer transition-colors"
-            title="Cấu hình mô hình AI"
-          >
-            <Settings2 className="w-4 h-4 text-indigo-600" />
-            <span className="hidden sm:inline">Cài Đặt AI</span>
-          </button>
-          <button
             onClick={() => setIsAiModalOpen(true)}
             className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-semibold shadow-md shadow-blue-500/20 flex items-center gap-2 cursor-pointer transition-all"
           >
@@ -263,17 +233,9 @@ export default function AssignmentStudio() {
             </strong>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] text-emerald-700 font-bold bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200">
-            ✓ Miễn phí hoàn toàn
-          </span>
-          <button
-            onClick={() => setIsAiConfigOpen(true)}
-            className="text-[11px] text-indigo-600 hover:underline font-semibold cursor-pointer"
-          >
-            Đổi / Thêm Gemini Key
-          </button>
-        </div>
+        <span className="text-[11px] text-emerald-700 font-bold bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200">
+          ✓ Miễn phí hoàn toàn
+        </span>
       </div>
 
       {/* Filter Tabs */}
@@ -469,61 +431,6 @@ export default function AssignmentStudio() {
         </form>
       </Modal>
 
-      {/* Modal: AI Settings / Key Config */}
-      <Modal isOpen={isAiConfigOpen} onClose={() => setIsAiConfigOpen(false)} title="Cài Đặt Cấu Hình AI (Miễn Phí)" maxWidth="max-w-md">
-        <form onSubmit={handleSaveApiKey} className="space-y-4 text-xs">
-          <div className="p-3 rounded-xl bg-purple-50 border border-purple-200 text-purple-900 leading-relaxed">
-            <p className="font-semibold mb-1">💡 Hệ thống hỗ trợ 2 chế độ AI hoàn toàn miễn phí:</p>
-            <ul className="list-disc pl-4 space-y-1 text-[11px] text-purple-800">
-              <li><strong>SEMS AI Engine nội bộ:</strong> Miễn phí 100%, không cần API Key, hoạt động mượt mà offline.</li>
-              <li><strong>Google Gemini 3.8 Flash:</strong> Model Gemini Flash hiện hành của Google.</li>
-            </ul>
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="font-semibold text-slate-700">Google Gemini API Key (Tùy chọn):</label>
-              <a
-                href="https://aistudio.google.com/app/apikey"
-                target="_blank"
-                rel="noreferrer"
-                className="text-[11px] text-blue-600 hover:underline flex items-center gap-1 font-semibold"
-              >
-                <span>Lấy Key miễn phí</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
-            <input
-              type="text"
-              value={configKeyInput}
-              onChange={(e) => setConfigKeyInput(e.target.value)}
-              placeholder="Dán AIzaSy... (để trống nếu muốn dùng AI nội bộ)"
-              className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono text-xs focus:ring-2 focus:ring-purple-500 focus:outline-none"
-            />
-            <p className="text-[10px] text-slate-400 mt-1">
-              * Key chỉ lưu an toàn trên máy chủ của bạn để sinh đề và chấm bài tự động.
-            </p>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={() => setIsAiConfigOpen(false)}
-              className="px-4 py-2 border rounded-xl text-slate-600 hover:bg-slate-50 cursor-pointer"
-            >
-              Đóng
-            </button>
-            <button
-              type="submit"
-              disabled={configKeyLoading}
-              className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold cursor-pointer disabled:opacity-50"
-            >
-              {configKeyLoading ? 'Đang lưu...' : 'Lưu Cấu Hình'}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
       {/* Modal: Review, Edit & Validate Assignment */}
       <Modal
         isOpen={isReviewOpen}
@@ -581,7 +488,7 @@ export default function AssignmentStudio() {
                     Điểm đánh giá: {validationResult.validationScore || 95} / 100
                   </span>
                 </div>
-                <div className="grid grid-cols-3 gap-2 pt-1 text-[11px]">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-[11px]">
                   <div className="p-2 bg-white rounded-lg border border-slate-200">
                     <span className="text-slate-400 block">Khớp mục tiêu:</span>
                     <strong className="text-emerald-600">Đạt 100%</strong>

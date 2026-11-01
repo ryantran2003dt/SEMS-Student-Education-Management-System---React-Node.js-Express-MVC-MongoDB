@@ -6,7 +6,6 @@ import Modal from './Modal';
 import api from '../services/api';
 import {
   LogOut,
-  GraduationCap,
   KeyRound,
   CheckCircle,
   AlertCircle,
@@ -176,24 +175,26 @@ export default function Navbar() {
   return (
     <>
       <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex min-w-0 items-center justify-between gap-2">
           {/* Brand */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
-              <GraduationCap className="w-6 h-6" />
-            </div>
-            <div>
-              <span className="font-extrabold text-xl tracking-tight text-slate-800">
-                SEMS <span className="text-blue-600 font-semibold text-sm">Học Viện Tin Học</span>
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <img
+              src="/logo-tin-hoc-de-hieu.png"
+              alt="Tin Học Dễ Hiểu"
+              className="w-10 h-10 sm:w-11 sm:h-11 shrink-0 rounded-full object-contain border border-slate-100"
+            />
+            <div className="min-w-0">
+              <span className="block truncate font-extrabold text-base sm:text-xl tracking-tight text-slate-800">
+                Tin Học <span className="text-blue-600 font-semibold text-sm">Dễ Hiểu</span>
               </span>
-              <p className="text-[11px] text-slate-400 font-medium hidden sm:block">
+              <p className="text-[11px] text-slate-400 font-medium hidden md:block">
                 Hệ thống Quản lý Giáo dục & Đào tạo
               </p>
             </div>
           </div>
 
           {/* User profile & actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-0.5 sm:gap-2">
             {/* Notification Bell */}
             <div className="relative" ref={notifRef}>
               <button
@@ -214,7 +215,7 @@ export default function Navbar() {
 
               {/* Notification Dropdown Panel */}
               {isNotifOpen && (
-                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-1.5rem)] sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                   <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-xs text-slate-800">Thông Báo</span>
@@ -278,7 +279,7 @@ export default function Navbar() {
             {/* User Info clickable to Profile */}
             <div
               onClick={() => setIsProfileModalOpen(true)}
-              className="flex items-center gap-2.5 cursor-pointer p-1.5 rounded-xl hover:bg-slate-100 transition-colors"
+              className="flex items-center gap-1.5 sm:gap-2.5 cursor-pointer p-1 sm:p-1.5 rounded-xl hover:bg-slate-100 transition-colors"
               title="Xem và chỉnh sửa hồ sơ cá nhân"
             >
               <div className="text-right hidden sm:block">

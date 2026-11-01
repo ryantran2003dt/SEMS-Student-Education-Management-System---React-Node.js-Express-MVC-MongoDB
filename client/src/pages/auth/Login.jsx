@@ -1,10 +1,17 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../../stores/authStore';
-import { GraduationCap, Lock, Mail, ArrowRight, Eye, EyeOff, ShieldCheck, UserCheck, BookOpen } from 'lucide-react';
+import { Lock, Mail, ArrowRight, Eye, EyeOff, ShieldCheck, UserCheck, BookOpen } from 'lucide-react';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
+  const [rememberEmail, setRememberEmail] = useState(
+    () => localStorage.getItem('sems_remember_email') === 'true'
+  );
+  const [email, setEmail] = useState(
+    () => localStorage.getItem('sems_remember_email') === 'true'
+      ? localStorage.getItem('sems_saved_email') || ''
+      : ''
+  );
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -24,6 +31,13 @@ export default function Login() {
     setErrMsg('');
     try {
       const user = await login(email.trim(), password);
+      if (rememberEmail) {
+        localStorage.setItem('sems_saved_email', email.trim());
+        localStorage.setItem('sems_remember_email', 'true');
+      } else {
+        localStorage.removeItem('sems_saved_email');
+        localStorage.removeItem('sems_remember_email');
+      }
       navigate(`/${user.role}`);
     } catch (err) {
       setErrMsg(err.message || 'Email hoặc mật khẩu không chính xác');
@@ -32,19 +46,29 @@ export default function Login() {
     }
   };
 
+  const handleRememberEmailChange = (e) => {
+    const shouldRemember = e.target.checked;
+    setRememberEmail(shouldRemember);
+    if (shouldRemember) {
+      localStorage.setItem('sems_remember_email', 'true');
+    } else {
+      localStorage.removeItem('sems_saved_email');
+      localStorage.removeItem('sems_remember_email');
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-100 to-indigo-100 flex items-center justify-center p-4">
       <div className="max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100">
         
         {/* Left Side: Brand & Feature Highlights */}
         <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-8 sm:p-10 text-white flex flex-col justify-between">
           <div>
-            <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center mb-6 border border-white/20 shadow-inner">
-              <GraduationCap className="w-7 h-7 text-white" />
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-              SEMS
-            </h1>
+            <img
+              src="/logo-tin-hoc-de-hieu.png"
+              alt="Tin Học Dễ Hiểu"
+              className="w-36 h-36 rounded-full object-contain bg-white mb-5 shadow-lg"
+            />
             <p className="text-blue-100 text-sm mt-1">
               Hệ Thống Quản Lý Giáo Dục & Đào Tạo
             </p>
@@ -56,7 +80,7 @@ export default function Login() {
           <div className="space-y-3.5 my-8">
             <div className="flex items-center gap-3 text-xs text-blue-50 bg-white/10 p-3 rounded-xl backdrop-blur-xs border border-white/10">
               <ShieldCheck className="w-5 h-5 text-emerald-300 shrink-0" />
-              <span>Phân quyền 4 vai trò độc lập & bảo mật dữ liệu ở mức đối tượng</span>
+              <span>Bảo mật dữ liệu ở mức đối tượng</span>
             </div>
             <div className="flex items-center gap-3 text-xs text-blue-50 bg-white/10 p-3 rounded-xl backdrop-blur-xs border border-white/10">
               <BookOpen className="w-5 h-5 text-amber-300 shrink-0" />
@@ -129,6 +153,16 @@ export default function Login() {
                 </button>
               </div>
             </div>
+
+            <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={rememberEmail}
+                onChange={handleRememberEmailChange}
+                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              Ghi nhớ tài khoản trên thiết bị này
+            </label>
 
             <button
               type="submit"

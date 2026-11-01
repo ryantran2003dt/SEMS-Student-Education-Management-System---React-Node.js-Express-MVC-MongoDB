@@ -38,7 +38,8 @@ export default function ParentAttendance() {
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <table className="w-full text-left border-collapse text-xs">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[600px] text-left border-collapse text-xs">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
               <th className="py-3 px-4">Buổi Học</th>
@@ -82,6 +83,7 @@ export default function ParentAttendance() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

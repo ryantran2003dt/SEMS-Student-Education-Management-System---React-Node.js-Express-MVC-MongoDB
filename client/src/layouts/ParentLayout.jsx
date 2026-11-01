@@ -15,9 +15,9 @@ export default function ParentLayout() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
       <Navbar />
-      <div className="flex flex-1 max-w-7xl w-full mx-auto">
+      <div className="flex flex-col md:flex-row flex-1 min-w-0 max-w-7xl w-full mx-auto">
         <Sidebar role="parent" />
-        <main className="flex-1 p-6 sm:p-8 overflow-y-auto">
+        <main className="min-w-0 flex-1 p-3 sm:p-5 lg:p-8 overflow-y-auto">
           <Outlet />
         </main>
       </div>

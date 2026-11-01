@@ -9,20 +9,12 @@ const GEMINI_FALLBACK_MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash-lite'];
 const GEMINI_REQUEST_TIMEOUT_MS = 20000;
 
 class AIService {
-  constructor() {
-    this.runtimeApiKey = '';
+  getEffectiveApiKey() {
+    return config.geminiApiKey || process.env.GEMINI_API_KEY || '';
   }
 
-  getEffectiveApiKey(customKey = '') {
-    return customKey || this.runtimeApiKey || config.geminiApiKey || process.env.GEMINI_API_KEY || '';
-  }
-
-  setRuntimeApiKey(key) {
-    this.runtimeApiKey = key ? key.trim() : '';
-  }
-
-  getAIStatus(customKey = '') {
-    const key = this.getEffectiveApiKey(customKey);
+  getAIStatus() {
+    const key = this.getEffectiveApiKey();
     return {
       hasGeminiKey: !!key,
       activeEngine: key ? 'Google Gemini (API key đã lưu, chưa kiểm tra)' : 'SEMS Intelligent Offline AI Engine (Tích hợp sẵn - Miễn phí)',
@@ -131,7 +123,6 @@ class AIService {
     difficulty = 'Trung bình',
     questionCount = 4,
     questionType = 'multiple_choice',
-    customApiKey = ''
   }) {
     let curriculumContext = '';
     let lessonTitle = topic || 'Bài tập rèn luyện kỹ năng';
@@ -149,7 +140,7 @@ class AIService {
       }
     }
 
-    const apiKey = this.getEffectiveApiKey(customApiKey);
+    const apiKey = this.getEffectiveApiKey();
 
     // 1. Thử gọi Google Gemini API nếu có key
     if (apiKey) {
@@ -358,7 +349,7 @@ Lưu ý:
   /**
    * AI Hỗ trợ chấm bài & viết nhận xét tự động
    */
-  async gradeSubmissionWithAI({ submissionId, customApiKey = '' }) {
+  async gradeSubmissionWithAI({ submissionId }) {
     const submission = await Submission.findById(submissionId).populate({
       path: 'assignmentId',
       populate: { path: 'classId' }
@@ -373,7 +364,7 @@ Lưu ý:
       throw new Error('Không tìm thấy thông tin đề bài tương ứng');
     }
 
-    const apiKey = this.getEffectiveApiKey(customApiKey);
+    const apiKey = this.getEffectiveApiKey();
 
     // Nếu có Gemini API Key, dùng Gemini để phân tích
     if (apiKey) {
@@ -558,6 +549,7 @@ ${roleContext}
 Xưng hô: Gọi người dùng là "${userName || (userRole === 'teacher' ? 'thầy/cô' : 'em')}", xưng là "tôi".
 Ngôn ngữ: Tiếng Việt, thân thiện, chuyên nghiệp.
 Phạm vi: Chỉ trả lời về Tin học, lập trình, toán học, và các câu hỏi học thuật liên quan. Từ chối lịch sự các câu hỏi ngoài phạm vi giáo dục.
+Hãy giải thích đầy đủ theo đúng mức độ câu hỏi, chia ý rõ ràng và thêm ví dụ thực tế hoặc đoạn mã khi hữu ích. Với yêu cầu thiết kế/lập kế hoạch, hãy trình bày từng bước cụ thể thay vì chỉ đưa ra ý tưởng tổng quát. Không tự giới hạn câu trả lời ở vài câu; ưu tiên chính xác và dễ áp dụng, tránh lặp ý.
 ${context ? `Ngữ cảnh bổ sung: ${context}` : ''}`;
 
     // Xây dựng lịch sử hội thoại
@@ -574,7 +566,7 @@ ${context ? `Ngữ cảnh bổ sung: ${context}` : ''}`;
       ],
       generationConfig: {
         temperature: 0.7,
-        maxOutputTokens: 1024
+        maxOutputTokens: 4096
       }
     };
 

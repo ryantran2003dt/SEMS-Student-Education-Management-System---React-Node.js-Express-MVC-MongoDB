@@ -15,20 +15,9 @@ class AIController {
     }
   }
 
-  async updateApiKey(req, res, next) {
-    try {
-      const { apiKey } = req.body;
-      aiService.setRuntimeApiKey(apiKey);
-      const status = aiService.getAIStatus();
-      return sendSuccess(res, status, 'Đã cập nhật cấu hình API Key thành công');
-    } catch (err) {
-      next(err);
-    }
-  }
-
   async generateAssignment(req, res, next) {
     try {
-      const { classId, lessonId, topic, difficulty, questionCount, questionType, apiKey } = req.body;
+      const { classId, lessonId, topic, difficulty, questionCount, questionType } = req.body;
 
       if (req.user.role === 'teacher') {
         const classObj = await Class.findById(classId);
@@ -43,8 +32,7 @@ class AIController {
         topic,
         difficulty,
         questionCount: Number(questionCount) || 4,
-        questionType,
-        customApiKey: apiKey
+        questionType
       });
       return sendSuccess(res, draft, 'AI đã sinh bản nháp bài tập thành công');
     } catch (err) {
@@ -55,7 +43,6 @@ class AIController {
   async gradeSubmission(req, res, next) {
     try {
       const { submissionId } = req.params;
-      const { apiKey } = req.body;
 
       const submission = await Submission.findById(submissionId).populate({
         path: 'assignmentId',
@@ -76,10 +63,7 @@ class AIController {
         }
       }
 
-      const result = await aiService.gradeSubmissionWithAI({
-        submissionId,
-        customApiKey: apiKey
-      });
+      const result = await aiService.gradeSubmissionWithAI({ submissionId });
 
       return sendSuccess(res, result, 'AI đã phân tích và đề xuất kết quả chấm điểm');
     } catch (err) {

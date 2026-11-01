@@ -8,9 +8,6 @@ router.use(authenticate);
 // Get AI status and engine info
 router.get('/status', aiController.getAIStatus);
 
-// Configure runtime API key
-router.post('/config-key', authorize('admin', 'teacher'), aiController.updateApiKey);
-
 // Generate assignment draft via AI (restricted to teacher & admin)
 router.post('/assignments/generate', authorize('admin', 'teacher'), aiController.generateAssignment);
 
