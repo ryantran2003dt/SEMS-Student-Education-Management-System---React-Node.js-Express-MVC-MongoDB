@@ -104,6 +104,31 @@ class AIController {
       next(err);
     }
   }
+
+  /**
+   * AI Chat - Hỗ trợ hỏi đáp học thuật cho học sinh & giáo viên
+   */
+  async chat(req, res, next) {
+    try {
+      const { message, history = [], context = '' } = req.body;
+
+      if (!message || !message.trim()) {
+        return sendError(res, 'Tin nhắn không được để trống', 400);
+      }
+
+      const result = await aiService.chatWithAI({
+        message: message.trim(),
+        history,
+        context,
+        userRole: req.user.role,
+        userName: req.user.fullName || req.user.username
+      });
+
+      return sendSuccess(res, result);
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 module.exports = new AIController();

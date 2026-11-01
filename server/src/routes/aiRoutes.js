@@ -20,4 +20,7 @@ router.post('/assignments/:id/validate', authorize('admin', 'teacher'), aiContro
 // AI Assistant Auto-Grading & Feedback for a submission
 router.post('/grade-submission/:submissionId', authorize('admin', 'teacher'), aiController.gradeSubmission);
 
+// AI Chat - hỏi đáp học thuật cho tất cả người dùng
+router.post('/chat', aiController.chat);
+
 module.exports = router;

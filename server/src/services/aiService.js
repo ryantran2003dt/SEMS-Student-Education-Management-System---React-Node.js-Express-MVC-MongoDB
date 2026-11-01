@@ -4,6 +4,10 @@ const { Class } = require('../models/Class');
 const Submission = require('../models/Submission');
 const Assignment = require('../models/Assignment');
 
+const GEMINI_MODEL = 'gemini-3.8-flash';
+const GEMINI_FALLBACK_MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash-lite'];
+const GEMINI_REQUEST_TIMEOUT_MS = 20000;
+
 class AIService {
   constructor() {
     this.runtimeApiKey = '';
@@ -21,10 +25,99 @@ class AIService {
     const key = this.getEffectiveApiKey(customKey);
     return {
       hasGeminiKey: !!key,
-      activeEngine: key ? 'Google Gemini 1.5 Flash (Gói Miễn Phí)' : 'SEMS Intelligent Offline AI Engine (Tích hợp sẵn - Miễn phí)',
-      model: key ? 'gemini-1.5-flash' : 'sems-nlp-v2.5',
+      activeEngine: key ? 'Google Gemini (API key đã lưu, chưa kiểm tra)' : 'SEMS Intelligent Offline AI Engine (Tích hợp sẵn - Miễn phí)',
+      model: key ? GEMINI_MODEL : 'sems-nlp-v2.5',
       isFree: true,
       freeKeyGuideUrl: 'https://aistudio.google.com/app/apikey'
+    };
+  }
+
+  async getGeminiError(response, model, apiKey) {
+    const responseText = await response.text();
+    let providerMessage = response.statusText;
+
+    if (responseText) {
+      try {
+        const errorData = JSON.parse(responseText);
+        providerMessage = errorData.error?.message || responseText;
+      } catch {
+        providerMessage = responseText;
+      }
+    }
+
+    const safeMessage = providerMessage.replaceAll(apiKey, '[ẩn API key]');
+    const error = new Error(`Google Gemini ${model} trả về HTTP ${response.status}: ${safeMessage}`);
+    error.statusCode = 502;
+    error.providerStatus = response.status;
+    return error;
+  }
+
+  async requestGeminiContent({ apiKey, body }) {
+    let lastError;
+    const models = [GEMINI_MODEL, ...GEMINI_FALLBACK_MODELS];
+
+    for (const model of models) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), GEMINI_REQUEST_TIMEOUT_MS);
+
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': apiKey
+            },
+            body: JSON.stringify(body),
+            signal: controller.signal
+          }
+        );
+
+        if (!response.ok) {
+          throw await this.getGeminiError(response, model, apiKey);
+        }
+
+        return {
+          data: await response.json(),
+          model
+        };
+      } catch (err) {
+        if (![429, 500, 502, 503, 504].includes(err.providerStatus) && !controller.signal.aborted) {
+          throw err;
+        }
+
+        lastError = controller.signal.aborted
+          ? new Error(`Google Gemini ${model} không phản hồi sau ${GEMINI_REQUEST_TIMEOUT_MS / 1000} giây.`)
+          : err;
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    }
+
+    throw lastError;
+  }
+
+  /**
+   * Gọi Gemini API, tự retry lỗi tạm thời và chuyển model khi quá tải.
+   */
+  async callGeminiAPI({ prompt, apiKey, temperature = 0.7, isJson = true }) {
+    const body = {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature }
+    };
+    if (isJson) {
+      body.generationConfig.responseMimeType = 'application/json';
+    }
+
+    const { data, model } = await this.requestGeminiContent({ apiKey, body });
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) throw new Error('Không nhận được nội dung từ Gemini');
+
+    const cleanedText = text.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
+    return {
+      result: isJson ? JSON.parse(cleanedText) : cleanedText,
+      model
     };
   }
 
@@ -58,26 +151,25 @@ class AIService {
 
     const apiKey = this.getEffectiveApiKey(customApiKey);
 
-    // 1. Thử gọi Google Gemini API (Gói Free Tier) nếu có key
+    // 1. Thử gọi Google Gemini API nếu có key
     if (apiKey) {
-      try {
-        const geminiResult = await this.callGeminiGenerate({
-          lessonTitle,
-          curriculumContext,
-          difficulty,
-          questionCount: Number(questionCount) || 4,
-          questionType,
-          apiKey
-        });
-        if (geminiResult && geminiResult.questions && geminiResult.questions.length > 0) {
-          return geminiResult;
-        }
-      } catch (err) {
-        console.warn('[AI Service] Gemini API failed or rate-limited. Falling back to built-in AI engine:', err.message);
+      const geminiResult = await this.callGeminiGenerate({
+        lessonTitle,
+        curriculumContext,
+        difficulty,
+        questionCount: Number(questionCount) || 4,
+        questionType,
+        apiKey
+      });
+      if (!geminiResult?.questions?.length) {
+        const error = new Error('Google Gemini không trả về danh sách câu hỏi hợp lệ.');
+        error.statusCode = 502;
+        throw error;
       }
+      return geminiResult;
     }
 
-    // 2. Tự động dùng SEMS Intelligent Built-in AI Engine (100% Miễn phí, không cần key)
+    // Use the built-in engine only when no Gemini API key is configured.
     return this.generateBuiltinQuestions({
       topic: lessonTitle,
       curriculumContext,
@@ -88,7 +180,7 @@ class AIService {
   }
 
   /**
-   * Gọi REST API Google Gemini 1.5 Flash (Free Tier)
+   * Gọi Gemini API để sinh đề bài
    */
   async callGeminiGenerate({ lessonTitle, curriculumContext, difficulty, questionCount, questionType, apiKey }) {
     const prompt = `Bạn là chuyên gia sư phạm và giảng viên Công nghệ thông tin / Tin học.
@@ -127,37 +219,17 @@ Lưu ý:
 - Nếu type là "essay", mảng options để rỗng [], correctAnswer là gợi ý đáp án/barem chấm.
 - Tổng điểm các câu hỏi phải bằng đúng 100 điểm.`;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          temperature: 0.7
-        }
-      })
+    const { result: parsed, model } = await this.callGeminiAPI({
+      prompt,
+      apiKey,
+      temperature: 0.7,
+      isJson: true
     });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Gemini API Error (${response.status}): ${errText}`);
-    }
-
-    const data = await response.json();
-    const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!candidateText) {
-      throw new Error('Không nhận được nội dung từ Gemini');
-    }
-
-    const cleanedText = candidateText.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
-    const parsed = JSON.parse(cleanedText);
 
     return {
       ...parsed,
       aiMetadata: {
-        modelUsed: 'Google Gemini 1.5 Flash (Free Tier)',
+        modelUsed: `Google ${model}`,
         generatedPrompt: `Generated ${questionCount} questions for ${lessonTitle} [${difficulty}]`,
         validationScore: 96,
         validationReport: {
@@ -165,7 +237,7 @@ Lưu ý:
           difficultyAppropriate: true,
           rubricComplete: true,
           suggestions: [
-            'Đề bài đã bám sát chuẩn đầu ra của bài học theo mô hình Gemini 1.5 Flash.',
+            'Đề bài đã bám sát chuẩn đầu ra của bài học theo mô hình Gemini 3.8 Flash.',
             'Đã cấu trúc sẵn các câu hỏi phân loại nhận biết, thông hiểu và vận dụng.',
             'Giáo viên có thể tinh chỉnh hoặc phê duyệt ban hành ngay cho học viên.'
           ]
@@ -179,10 +251,6 @@ Lưu ý:
    * Bộ sinh câu hỏi tự động nội bộ SEMS (100% Miễn phí, Offline)
    */
   generateBuiltinQuestions({ topic, curriculumContext, difficulty, questionCount, questionType }) {
-    const isBasic = difficulty === 'Dễ';
-    const isHard = difficulty === 'Khó';
-
-    // Ngân hàng câu hỏi động thông minh theo ngữ cảnh
     const templates = [
       {
         questionText: `Trong nội dung "${topic}", khái niệm nào sau đây đóng vai trò nền tảng nhất khi triển khai thực tế?`,
@@ -252,7 +320,7 @@ Lưu ý:
     ];
 
     let selected = templates.slice(0, Math.min(questionCount, templates.length));
-    
+
     // Chuẩn hóa điểm sao cho tổng bằng 100
     const pointPerQuestion = Math.floor(100 / selected.length);
     selected = selected.map((q, idx) => ({
@@ -288,7 +356,7 @@ Lưu ý:
   }
 
   /**
-   * TÍNH NĂNG MỚI: AI Hỗ trợ chấm bài & viết nhận xét tự động (AI Auto-Grading & Feedback)
+   * AI Hỗ trợ chấm bài & viết nhận xét tự động
    */
   async gradeSubmissionWithAI({ submissionId, customApiKey = '' }) {
     const submission = await Submission.findById(submissionId).populate({
@@ -307,26 +375,25 @@ Lưu ý:
 
     const apiKey = this.getEffectiveApiKey(customApiKey);
 
-    // 1. Nếu có Gemini API Key, thử gọi Gemini để phân tích bài làm chuyên sâu
+    // Nếu có Gemini API Key, dùng Gemini để phân tích
     if (apiKey) {
-      try {
-        const geminiGrade = await this.callGeminiGradeSubmission({
-          assignment,
-          submission,
-          apiKey
-        });
-        if (geminiGrade && typeof geminiGrade.score === 'number') {
-          return {
-            ...geminiGrade,
-            engineUsed: 'Google Gemini 1.5 Flash (Free Tier)'
-          };
-        }
-      } catch (err) {
-        console.warn('[AI Service] Gemini grading failed. Falling back to built-in grading engine:', err.message);
+      const { result: geminiGrade, model } = await this.callGeminiGradeSubmission({
+        assignment,
+        submission,
+        apiKey
+      });
+      if (typeof geminiGrade?.score !== 'number') {
+        const error = new Error('Google Gemini không trả về kết quả chấm điểm hợp lệ.');
+        error.statusCode = 502;
+        throw error;
       }
+      return {
+        ...geminiGrade,
+        engineUsed: `Google ${model}`
+      };
     }
 
-    // 2. Chấm bài bằng SEMS Semantic & Rubric Scoring Engine (Miễn phí 100%, Offline)
+    // Use the built-in engine only when no Gemini API key is configured.
     return this.gradeBuiltinSubmission({ assignment, submission });
   }
 
@@ -355,7 +422,7 @@ ${JSON.stringify(questionsContext, null, 2)}
 Nội dung ghi chú / bài viết tự luận bổ sung của học viên (nếu có):
 "${submission.submittedText || 'Không có'}"
 
-Hãy chấm điểm từng câu theo barem, tính tổng điểm (thang điểm 100), và viết lời nhận xét sư phạm chi tiết, mang tính khích lệ, chỉ rõ điểm làm tốt và điểm cần bổ sung kiến thức.
+Hãy chấm điểm từng câu theo barem, tính tổng điểm (thang điểm 100), và viết lời nhận xét sư phạm chi tiết, mang tính khích lệ.
 
 Trả về ĐÚNG ĐỊNH DẠNG JSON sau (không kèm markdown format, không bọc trong \`\`\`json):
 {
@@ -370,33 +437,11 @@ Trả về ĐÚNG ĐỊNH DẠNG JSON sau (không kèm markdown format, không b
   ]
 }`;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          temperature: 0.3
-        }
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Gemini Grading HTTP Error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!candidateText) throw new Error('Không nhận được kết quả chấm từ Gemini');
-
-    const cleanedText = candidateText.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
-    return JSON.parse(cleanedText);
+    return this.callGeminiAPI({ prompt, apiKey, temperature: 0.3, isJson: true });
   }
 
   /**
-   * Chấm bài tự động bằng bộ máy Semantic & Rule Engine nội bộ (Miễn phí 100%)
+   * Chấm bài tự động bằng bộ máy Semantic & Rule Engine nội bộ
    */
   gradeBuiltinSubmission({ assignment, submission }) {
     let totalScore = 0;
@@ -431,13 +476,11 @@ Trả về ĐÚNG ĐỊNH DẠNG JSON sau (không kèm markdown format, không b
           note = 'Chưa có câu trả lời.';
         } else {
           const lengthScore = Math.min(studentAnswer.length / 80, 1.0);
-          
-          // Kiểm tra từ khóa kỹ thuật liên quan
           const keywords = (q.explanation || q.correctAnswer || q.targetObjective || '')
             .toLowerCase()
             .split(/[\s,.;]+/)
             .filter(w => w.length > 3);
-          
+
           let matchCount = 0;
           keywords.forEach(kw => {
             if (studentAnswer.toLowerCase().includes(kw)) matchCount++;
@@ -446,7 +489,7 @@ Trả về ĐÚNG ĐỊNH DẠNG JSON sau (không kèm markdown format, không b
           const keywordRatio = keywords.length > 0 ? Math.min(matchCount / Math.max(keywords.length * 0.4, 1), 1.0) : 0.8;
           const scorePercent = 0.5 * lengthScore + 0.5 * keywordRatio;
 
-          awarded = Math.round(maxPts * Math.max(scorePercent, 0.6)); // Đạt tối thiểu 60% nếu có trình bày bài bản
+          awarded = Math.round(maxPts * Math.max(scorePercent, 0.6));
           awarded = Math.min(awarded, maxPts);
 
           if (awarded >= maxPts * 0.85) {
@@ -485,6 +528,167 @@ Trả về ĐÚNG ĐỊNH DẠNG JSON sau (không kèm markdown format, không b
       feedback,
       answersFeedback,
       engineUsed: 'SEMS Intelligent Education AI Engine (Tích hợp sẵn - Miễn phí)'
+    };
+  }
+
+  /**
+   * AI Chat - Hỏi đáp học thuật thông minh
+   */
+  async chatWithAI({ message, history = [], context = '', userRole, userName }) {
+    const apiKey = this.getEffectiveApiKey();
+
+    if (apiKey) {
+      return this.callGeminiChat({ message, history, context, userRole, userName, apiKey });
+    }
+
+    // Use the built-in engine only when no Gemini API key is configured.
+    return this.builtinChat({ message, userRole });
+  }
+
+  /**
+   * Gọi Gemini để trả lời chat
+   */
+  async callGeminiChat({ message, history, context, userRole, userName, apiKey }) {
+    const roleContext = userRole === 'teacher'
+      ? 'Người dùng là giáo viên, ưu tiên các câu trả lời về phương pháp giảng dạy, thiết kế bài tập, đánh giá học sinh.'
+      : 'Người dùng là học sinh, ưu tiên giải thích dễ hiểu, ví dụ thực tế, khuyến khích học tập.';
+
+    const systemInstruction = `Bạn là Trợ lý AI Giáo dục của hệ thống SEMS (Smart Education Management System) - chuyên về Tin học và Công nghệ thông tin.
+${roleContext}
+Xưng hô: Gọi người dùng là "${userName || (userRole === 'teacher' ? 'thầy/cô' : 'em')}", xưng là "tôi".
+Ngôn ngữ: Tiếng Việt, thân thiện, chuyên nghiệp.
+Phạm vi: Chỉ trả lời về Tin học, lập trình, toán học, và các câu hỏi học thuật liên quan. Từ chối lịch sự các câu hỏi ngoài phạm vi giáo dục.
+${context ? `Ngữ cảnh bổ sung: ${context}` : ''}`;
+
+    // Xây dựng lịch sử hội thoại
+    const historyMessages = history.slice(-10).map(h => ({
+      role: h.role === 'user' ? 'user' : 'model',
+      parts: [{ text: h.content }]
+    }));
+
+    const body = {
+      system_instruction: { parts: [{ text: systemInstruction }] },
+      contents: [
+        ...historyMessages,
+        { role: 'user', parts: [{ text: message }] }
+      ],
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 1024
+      }
+    };
+
+    const { data, model } = await this.requestGeminiContent({ apiKey, body });
+    const replyText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!replyText) {
+      const error = new Error('Google Gemini không trả về nội dung. Kiểm tra quyền truy cập model hoặc thử lại.');
+      error.statusCode = 502;
+      throw error;
+    }
+
+    return {
+      reply: replyText,
+      engineUsed: `Google ${model}`
+    };
+  }
+
+  /**
+   * Built-in Chat Engine (không cần API Key)
+   */
+  builtinChat({ message, userRole }) {
+    const msg = message.toLowerCase();
+    let reply = '';
+
+    // Pattern matching đơn giản
+    if (msg.includes('html') || msg.includes('css') || msg.includes('web')) {
+      reply = `HTML (HyperText Markup Language) là ngôn ngữ đánh dấu để tạo cấu trúc trang web. CSS (Cascading Style Sheets) dùng để định dạng giao diện.
+
+**Ví dụ cơ bản:**
+\`\`\`html
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Trang web của tôi</title>
+  </head>
+  <body>
+    <h1>Xin chào!</h1>
+    <p>Đây là đoạn văn.</p>
+  </body>
+</html>
+\`\`\`
+
+Bạn có muốn tôi giải thích thêm về phần nào không?`;
+    } else if (msg.includes('javascript') || msg.includes('js') || msg.includes('lập trình')) {
+      reply = `JavaScript là ngôn ngữ lập trình phổ biến nhất cho web, chạy trực tiếp trên trình duyệt.
+
+**Các khái niệm cơ bản:**
+- **Biến**: \`let\`, \`const\`, \`var\`
+- **Hàm**: \`function\` hoặc arrow function \`() => {}\`
+- **Vòng lặp**: \`for\`, \`while\`, \`forEach\`
+- **Điều kiện**: \`if/else\`, \`switch\`
+
+Bạn đang học đến phần nào? Tôi có thể giải thích chi tiết hơn!`;
+    } else if (msg.includes('thuật toán') || msg.includes('algorithm') || msg.includes('sắp xếp')) {
+      reply = `Thuật toán là tập hợp các bước có thứ tự để giải quyết một bài toán cụ thể.
+
+**Các thuật toán sắp xếp phổ biến:**
+| Thuật toán | Thời gian trung bình | Ghi chú |
+|-----------|---------------------|---------|
+| Bubble Sort | O(n²) | Đơn giản, chậm |
+| Selection Sort | O(n²) | Dễ hiểu |
+| Quick Sort | O(n log n) | Nhanh trong thực tế |
+| Merge Sort | O(n log n) | Ổn định |
+
+Bạn muốn tìm hiểu thuật toán nào cụ thể?`;
+    } else if (msg.includes('cơ sở dữ liệu') || msg.includes('database') || msg.includes('sql') || msg.includes('mongodb')) {
+      reply = `Cơ sở dữ liệu (Database) là hệ thống lưu trữ và quản lý dữ liệu có cấu trúc.
+
+**Hai loại chính:**
+- **SQL** (Quan hệ): MySQL, PostgreSQL - dữ liệu dạng bảng
+- **NoSQL** (Phi quan hệ): MongoDB, Redis - dữ liệu dạng document/key-value
+
+**Câu lệnh SQL cơ bản:**
+\`\`\`sql
+SELECT * FROM students WHERE score > 80;
+INSERT INTO students (name, score) VALUES ('An', 95);
+UPDATE students SET score = 90 WHERE id = 1;
+DELETE FROM students WHERE id = 1;
+\`\`\`
+
+Bạn đang học SQL hay MongoDB?`;
+    } else if (msg.includes('xin chào') || msg.includes('hello') || msg.includes('chào')) {
+      const greeting = userRole === 'teacher' ? 'thầy/cô' : 'bạn';
+      reply = `Xin chào ${greeting}! 👋 Tôi là Trợ lý AI Giáo dục của SEMS.
+
+Tôi có thể giúp ${greeting}:
+- 📚 Giải thích các khái niệm Tin học, lập trình
+- 🧮 Hỗ trợ bài tập thuật toán, cấu trúc dữ liệu
+- 💡 Hướng dẫn web development, database
+- 🔍 Trả lời câu hỏi học thuật
+
+${greeting === 'thầy/cô' ? 'Tôi cũng có thể hỗ trợ thiết kế đề bài và phương pháp giảng dạy!' : ''}
+
+Bạn cần tôi hỗ trợ gì hôm nay?`;
+    } else {
+      reply = `Cảm ơn câu hỏi của bạn về: **"${message}"**
+
+Tôi là Trợ lý AI Giáo dục nội bộ của SEMS (hoạt động offline, không cần API Key). Tôi có thể hỗ trợ tốt nhất về:
+
+📌 **Các chủ đề chính:**
+- Lập trình: HTML, CSS, JavaScript, Python
+- Cấu trúc dữ liệu & Giải thuật
+- Cơ sở dữ liệu (SQL, MongoDB)
+- Mạng máy tính & Bảo mật
+- Phương pháp nghiên cứu khoa học
+
+💡 *Gợi ý: Thêm Gemini API Key (miễn phí) trong Cài Đặt AI để nhận câu trả lời chính xác và chi tiết hơn!*
+
+Bạn có thể hỏi cụ thể hơn về chủ đề bạn cần không?`;
+    }
+
+    return {
+      reply,
+      engineUsed: 'SEMS Built-in AI Engine (Offline)'
     };
   }
 

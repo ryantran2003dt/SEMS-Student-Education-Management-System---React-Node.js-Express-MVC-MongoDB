@@ -71,6 +71,15 @@ Hệ thống đã được nạp sẵn dữ liệu mẫu thực tế. Tại màn
 
 ### Bước 1: Khởi động Backend (Server)
 
+Để dùng Google Gemini, tạo file `server/.env.local` (file này không được Git theo dõi) và thêm:
+
+```env
+GEMINI_API_KEY=your_gemini_api_key
+```
+
+Sau đó khởi động lại backend để nạp cấu hình. Không đưa API key vào mã nguồn hoặc commit key lên Git.
+Nếu Gemini tạm quá tải (HTTP 503), backend sẽ tự thử lại với thời gian chờ tăng dần rồi chuyển sang các model Flash dự phòng đang được hỗ trợ.
+
 ```powershell
 cd server
 npm start

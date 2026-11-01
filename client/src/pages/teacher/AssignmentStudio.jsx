@@ -476,7 +476,7 @@ export default function AssignmentStudio() {
             <p className="font-semibold mb-1">💡 Hệ thống hỗ trợ 2 chế độ AI hoàn toàn miễn phí:</p>
             <ul className="list-disc pl-4 space-y-1 text-[11px] text-purple-800">
               <li><strong>SEMS AI Engine nội bộ:</strong> Miễn phí 100%, không cần API Key, hoạt động mượt mà offline.</li>
-              <li><strong>Google Gemini 1.5 Flash:</strong> Gói miễn phí từ Google (15 requests/phút).</li>
+              <li><strong>Google Gemini 3.8 Flash:</strong> Model Gemini Flash hiện hành của Google.</li>
             </ul>
           </div>
 

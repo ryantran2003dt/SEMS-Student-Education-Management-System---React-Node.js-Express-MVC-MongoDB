@@ -38,6 +38,9 @@ import ParentDashboard from '../pages/parent/ParentDashboard';
 import ParentAttendance from '../pages/parent/ParentAttendance';
 import ParentGrades from '../pages/parent/ParentGrades';
 
+// Shared AI Chat
+import AIChat from '../pages/shared/AIChat';
+
 export default function AppRoutes() {
   const { user } = useAuthStore();
 
@@ -61,6 +64,7 @@ export default function AppRoutes() {
         <Route path="attendance" element={<AttendanceSheet />} />
         <Route path="assignments" element={<AssignmentStudio />} />
         <Route path="grading" element={<GradingSubmissions />} />
+        <Route path="ai-chat" element={<AIChat />} />
       </Route>
 
       {/* Student routes */}
@@ -71,6 +75,7 @@ export default function AppRoutes() {
         <Route path="assignments/:id" element={<TakeAssignment />} />
         <Route path="progress" element={<StudentProgress />} />
         <Route path="certificates" element={<StudentCertificates />} />
+        <Route path="ai-chat" element={<AIChat />} />
       </Route>
 
       {/* Parent routes */}
