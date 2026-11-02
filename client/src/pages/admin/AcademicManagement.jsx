@@ -323,9 +323,6 @@ export default function AcademicManagement() {
                           >
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <div className="flex min-w-0 items-center gap-3">
-                                <span className="shrink-0 text-xs font-bold text-indigo-600 font-mono">
-                                  Buổi {lesson.sessionNumber}
-                                </span>
                                 <h4 className="text-sm font-bold text-slate-800">{lesson.title}</h4>
                               </div>
                               <div className="flex items-center gap-2">
