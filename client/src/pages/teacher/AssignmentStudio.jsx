@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import Modal from '../../components/Modal';
+import useAuthStore from '../../stores/authStore';
 import {
   Sparkles,
   Plus,
@@ -10,6 +11,7 @@ import {
   Send,
   Edit3,
   Trash2,
+  Loader2,
   AlertTriangle,
   Award,
   CheckCircle2,
@@ -19,6 +21,7 @@ import {
 } from 'lucide-react';
 
 export default function AssignmentStudio() {
+  const { user } = useAuthStore();
   const [assignments, setAssignments] = useState([]);
   const [classes, setClasses] = useState([]);
   const [selectedClassId, setSelectedClassId] = useState('');
@@ -45,6 +48,7 @@ export default function AssignmentStudio() {
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [validationResult, setValidationResult] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [deletingAssignmentId, setDeletingAssignmentId] = useState('');
 
   useEffect(() => {
     loadData();
@@ -177,6 +181,39 @@ export default function AssignmentStudio() {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const handleDeleteAssignment = async (assignment) => {
+    const confirmed = window.confirm(
+      `Bạn có chắc muốn xóa bài tập "${assignment.title}"? Các bài nộp và điểm của học viên cho bài tập này cũng sẽ bị xóa.`
+    );
+    if (!confirmed) return;
+
+    setDeletingAssignmentId(assignment._id);
+    try {
+      await api.delete(`/assignments/${assignment._id}`);
+      setAssignments((currentAssignments) =>
+        currentAssignments.filter((item) => item._id !== assignment._id)
+      );
+      if (activeAssignment?._id === assignment._id) {
+        setIsReviewOpen(false);
+        setActiveAssignment(null);
+      }
+    } catch (err) {
+      alert(`Không thể xóa bài tập: ${err.message}`);
+    } finally {
+      setDeletingAssignmentId('');
+    }
+  };
+
+  const canDeleteAssignment = (assignment) => {
+    const currentUserId = user?._id || user?.id;
+    const assignmentTeacherId = assignment.teacherId?._id
+      || assignment.teacherId?.id
+      || assignment.teacherId;
+
+    return user?.role === 'admin'
+      || (Boolean(currentUserId) && String(assignmentTeacherId) === String(currentUserId));
   };
 
   const statusBadge = (status) => {
@@ -312,11 +349,25 @@ export default function AssignmentStudio() {
             <div className="mt-5 pt-3 border-t border-slate-100 flex items-center gap-2">
               <button
                 onClick={() => openReviewModal(ass)}
-                className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                className={`${canDeleteAssignment(ass) ? 'flex-1' : 'w-full'} py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer`}
               >
                 <Eye className="w-3.5 h-3.5" />
                 <span>Xem & Kiểm Định</span>
               </button>
+              {canDeleteAssignment(ass) && (
+                <button
+                  type="button"
+                  onClick={() => handleDeleteAssignment(ass)}
+                  disabled={deletingAssignmentId === ass._id}
+                  aria-label={`Xóa bài tập ${ass.title}`}
+                  title="Xóa bài tập"
+                  className="shrink-0 rounded-xl border border-red-200 bg-red-50 p-2 text-red-600 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {deletingAssignmentId === ass._id
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : <Trash2 className="h-4 w-4" />}
+                </button>
+              )}
             </div>
           </div>
         ))}
@@ -448,6 +499,16 @@ export default function AssignmentStudio() {
                 <span className="text-slate-500">Thang điểm: {activeAssignment.maxScore}</span>
               </div>
               <div className="flex items-center gap-2">
+                {canDeleteAssignment(activeAssignment) && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteAssignment(activeAssignment)}
+                    disabled={deletingAssignmentId === activeAssignment._id}
+                    className="px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 font-semibold border border-red-200 transition-colors disabled:opacity-50 cursor-pointer"
+                  >
+                    {deletingAssignmentId === activeAssignment._id ? 'Đang xóa...' : 'Xóa bài tập'}
+                  </button>
+                )}
                 <button
                   onClick={handleValidateAssignment}
                   disabled={actionLoading}
