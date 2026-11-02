@@ -8,7 +8,7 @@ export default function AcademicManagement() {
   const [courses, setCourses] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [lessons, setLessons] = useState([]);
-  const [lessonsExpanded, setLessonsExpanded] = useState(true);
+  const [expandedLessons, setExpandedLessons] = useState({});
   const [curriculums, setCurriculums] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -299,45 +299,50 @@ export default function AcademicManagement() {
 
               {/* Lessons List */}
               <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs">
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-indigo-600" />
-                    <span>Danh Sách Bài Học Theo Buổi & Chuẩn Đầu Ra</span>
-                    <span className="text-xs font-medium text-slate-500">({lessons.length})</span>
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => setLessonsExpanded((expanded) => !expanded)}
-                    aria-expanded={lessonsExpanded}
-                    aria-controls="course-lessons-list"
-                    className="shrink-0 inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100"
-                  >
-                    <ChevronRight className={`w-4 h-4 transition-transform ${lessonsExpanded ? 'rotate-90' : ''}`} />
-                    {lessonsExpanded ? 'Thu gọn' : 'Mở rộng'}
-                  </button>
-                </div>
+                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-indigo-600" />
+                  <span>Danh Sách Bài Học Theo Buổi & Chuẩn Đầu Ra</span>
+                  <span className="text-xs font-medium text-slate-500">({lessons.length})</span>
+                </h3>
 
-                {lessonsExpanded && (
-                  <div id="course-lessons-list" className="mt-4">
-                    {lessons.length === 0 ? (
-                      <div className="text-center py-8 text-slate-400 text-xs">
-                        Chưa có bài học nào trong khóa học này. Hãy nhấn 'Thêm Bài Học'.
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {lessons.map((lesson) => (
+                <div className="mt-4">
+                  {lessons.length === 0 ? (
+                    <div className="text-center py-8 text-slate-400 text-xs">
+                      Chưa có bài học nào trong khóa học này. Hãy nhấn 'Thêm Bài Học'.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {lessons.map((lesson) => {
+                        const isExpanded = expandedLessons[lesson._id] ?? true;
+                        const contentId = `lesson-content-${lesson._id}`;
+
+                        return (
                           <div
                             key={lesson._id}
                             className="p-4 rounded-xl border border-slate-100 hover:border-slate-200 bg-slate-50/50 transition-colors"
                           >
                             <div className="flex flex-wrap items-center justify-between gap-2">
-                              <span className="text-xs font-bold text-indigo-600 font-mono">
-                                Buổi {lesson.sessionNumber}
-                              </span>
-                              <div className="flex items-center gap-2">
-                                <span className="text-[11px] text-slate-500 px-2 py-0.5 rounded bg-white border border-slate-200">
-                                  Chủ đề: {lesson.topic}
+                              <div className="flex min-w-0 items-center gap-3">
+                                <span className="shrink-0 text-xs font-bold text-indigo-600 font-mono">
+                                  Buổi {lesson.sessionNumber}
                                 </span>
+                                <h4 className="text-sm font-bold text-slate-800">{lesson.title}</h4>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedLessons((expanded) => ({
+                                    ...expanded,
+                                    [lesson._id]: !isExpanded
+                                  }))}
+                                  aria-expanded={isExpanded}
+                                  aria-controls={contentId}
+                                  aria-label={`${isExpanded ? 'Thu gọn' : 'Mở rộng'} nội dung buổi ${lesson.sessionNumber}`}
+                                  className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-white"
+                                >
+                                  <ChevronRight className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                                  {isExpanded ? 'Thu gọn' : 'Xem nội dung'}
+                                </button>
                                 <button
                                   type="button"
                                   onClick={() => openEditLessonModal(lesson)}
@@ -349,25 +354,29 @@ export default function AcademicManagement() {
                                 </button>
                               </div>
                             </div>
-                            <h4 className="text-sm font-bold text-slate-800 mt-1">{lesson.title}</h4>
 
-                            {lesson.objectives?.length > 0 && (
-                              <div className="mt-2.5 space-y-1">
-                                <span className="text-[11px] font-semibold text-slate-600 block">Mục tiêu chuẩn đầu ra:</span>
-                                {lesson.objectives.map((obj, i) => (
-                                  <div key={i} className="text-xs text-slate-600 flex items-start gap-1.5 pl-1">
-                                    <span className="text-emerald-500 font-bold">•</span>
-                                    <span>{obj}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                            <div id={contentId} hidden={!isExpanded} className="mt-2.5 space-y-2">
+                              <span className="inline-block text-[11px] text-slate-500 px-2 py-0.5 rounded bg-white border border-slate-200">
+                                Chủ đề: {lesson.topic}
+                              </span>
+                              {lesson.objectives?.length > 0 && (
+                                <div className="space-y-1">
+                                  <span className="text-[11px] font-semibold text-slate-600 block">Mục tiêu chuẩn đầu ra:</span>
+                                  {lesson.objectives.map((obj, i) => (
+                                    <div key={i} className="text-xs text-slate-600 flex items-start gap-1.5 pl-1">
+                                      <span className="text-emerald-500 font-bold">•</span>
+                                      <span>{obj}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             </>
           ) : (
