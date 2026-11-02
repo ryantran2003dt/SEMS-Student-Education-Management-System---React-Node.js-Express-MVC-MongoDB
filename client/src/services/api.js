@@ -28,8 +28,12 @@ api.interceptors.response.use(
         window.location.href = '/login';
       }
     }
-    const message = error.response?.data?.message || error.message || 'Lỗi kết nối máy chủ';
-    return Promise.reject(new Error(message));
+    const responseData = error.response?.data;
+    const message = responseData?.message || error.message || 'Lỗi kết nối máy chủ';
+    const details = Array.isArray(responseData?.errors)
+      ? responseData.errors.filter(Boolean).join('; ')
+      : '';
+    return Promise.reject(new Error(details ? `${message}: ${details}` : message));
   }
 );
 
