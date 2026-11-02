@@ -148,8 +148,12 @@ class AcademicService {
     return await lesson.save();
   }
 
-  async updateLesson(id, data) {
-    return await Lesson.findByIdAndUpdate(id, data, { new: true });
+  async updateLesson(courseId, lessonId, data) {
+    return await Lesson.findOneAndUpdate(
+      { _id: lessonId, courseId },
+      data,
+      { new: true, runValidators: true }
+    );
   }
 
   async deleteLesson(id) {

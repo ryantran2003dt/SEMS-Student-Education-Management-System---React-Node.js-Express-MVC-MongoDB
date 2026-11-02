@@ -23,5 +23,6 @@ router.post('/courses/:courseId/curriculums', authorize('admin'), academicContro
 // Lessons
 router.get('/courses/:courseId/lessons', academicController.listLessons);
 router.post('/courses/:courseId/lessons', authorize('admin', 'teacher'), academicController.createLesson);
+router.put('/courses/:courseId/lessons/:lessonId', authorize('admin'), academicController.updateLesson);
 
 module.exports = router;

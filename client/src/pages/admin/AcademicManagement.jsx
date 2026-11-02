@@ -17,6 +17,7 @@ export default function AcademicManagement() {
   const [isLessonModalOpen, setIsLessonModalOpen] = useState(false);
   const [isEditingCourse, setIsEditingCourse] = useState(false);
   const [deletingCourse, setDeletingCourse] = useState(false);
+  const [editingLessonId, setEditingLessonId] = useState(null);
 
   const [subjectForm, setSubjectForm] = useState({ name: '', description: '', level: 'Cơ bản - Nâng cao' });
   const [courseForm, setCourseForm] = useState({ subjectId: '', name: '', targetAudience: '', objective: '', durationHours: 36, expectedSessions: 12 });
@@ -125,15 +126,43 @@ export default function AcademicManagement() {
   const handleCreateLesson = async (e) => {
     e.preventDefault();
     try {
-      await api.post(`/academic/courses/${selectedCourse._id}/lessons`, {
+      const payload = {
         ...lessonForm,
-        objectives: lessonForm.objectives.split('\n').filter(Boolean)
-      });
+        objectives: lessonForm.objectives.split('\n').map((objective) => objective.trim()).filter(Boolean)
+      };
+      if (editingLessonId) {
+        await api.put(`/academic/courses/${selectedCourse._id}/lessons/${editingLessonId}`, payload);
+      } else {
+        await api.post(`/academic/courses/${selectedCourse._id}/lessons`, payload);
+      }
       setIsLessonModalOpen(false);
+      setEditingLessonId(null);
       selectCourse(selectedCourse);
     } catch (err) {
       alert(err.message);
     }
+  };
+
+  const openCreateLessonModal = () => {
+    setEditingLessonId(null);
+    setLessonForm({
+      title: '',
+      topic: '',
+      sessionNumber: lessons.length + 1,
+      objectives: ''
+    });
+    setIsLessonModalOpen(true);
+  };
+
+  const openEditLessonModal = (lesson) => {
+    setEditingLessonId(lesson._id);
+    setLessonForm({
+      title: lesson.title || '',
+      topic: lesson.topic || '',
+      sessionNumber: lesson.sessionNumber,
+      objectives: (lesson.objectives || []).join('\n')
+    });
+    setIsLessonModalOpen(true);
   };
 
   return (
@@ -245,10 +274,7 @@ export default function AcademicManagement() {
                       <Trash2 className="w-3.5 h-3.5" /> {deletingCourse ? 'Đang xóa...' : 'Xóa'}
                     </button>
                     <button
-                      onClick={() => {
-                        setLessonForm({ ...lessonForm, sessionNumber: lessons.length + 1 });
-                        setIsLessonModalOpen(true);
-                      }}
+                      onClick={openCreateLessonModal}
                       className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5"
                     >
                       <Plus className="w-3.5 h-3.5" /> Thêm Bài Học
@@ -288,13 +314,24 @@ export default function AcademicManagement() {
                         key={lesson._id}
                         className="p-4 rounded-xl border border-slate-100 hover:border-slate-200 bg-slate-50/50 transition-colors"
                       >
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
                           <span className="text-xs font-bold text-indigo-600 font-mono">
                             Buổi {lesson.sessionNumber}
                           </span>
-                          <span className="text-[11px] text-slate-500 px-2 py-0.5 rounded bg-white border border-slate-200">
-                            Chủ đề: {lesson.topic}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] text-slate-500 px-2 py-0.5 rounded bg-white border border-slate-200">
+                              Chủ đề: {lesson.topic}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => openEditLessonModal(lesson)}
+                              aria-label={`Sửa buổi ${lesson.sessionNumber}`}
+                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"
+                            >
+                              <Pencil className="h-3 w-3" />
+                              Sửa
+                            </button>
+                          </div>
                         </div>
                         <h4 className="text-sm font-bold text-slate-800 mt-1">{lesson.title}</h4>
                         
@@ -446,7 +483,14 @@ export default function AcademicManagement() {
       </Modal>
 
       {/* Modal: Add Lesson */}
-      <Modal isOpen={isLessonModalOpen} onClose={() => setIsLessonModalOpen(false)} title={`Thêm Bài Học - ${selectedCourse?.name}`}>
+      <Modal
+        isOpen={isLessonModalOpen}
+        onClose={() => {
+          setIsLessonModalOpen(false);
+          setEditingLessonId(null);
+        }}
+        title={`${editingLessonId ? 'Chỉnh Sửa' : 'Thêm'} Buổi Học - ${selectedCourse?.name}`}
+      >
         <form onSubmit={handleCreateLesson} className="space-y-4 text-xs">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
@@ -496,7 +540,9 @@ export default function AcademicManagement() {
           </div>
           <div className="flex justify-end gap-2 pt-4 border-t">
             <button type="button" onClick={() => setIsLessonModalOpen(false)} className="px-4 py-2 border rounded-xl">Hủy</button>
-            <button type="submit" className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-xl">Lưu Bài Học</button>
+            <button type="submit" className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-xl">
+              {editingLessonId ? 'Lưu Thay Đổi' : 'Lưu Bài Học'}
+            </button>
           </div>
         </form>
       </Modal>

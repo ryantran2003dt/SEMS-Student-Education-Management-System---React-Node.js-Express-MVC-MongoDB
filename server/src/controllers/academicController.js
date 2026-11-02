@@ -125,6 +125,23 @@ class AcademicController {
       next(err);
     }
   }
+
+  async updateLesson(req, res, next) {
+    try {
+      const { sessionNumber, title, topic, objectives } = req.body;
+      const lesson = await academicService.updateLesson(
+        req.params.courseId,
+        req.params.lessonId,
+        { sessionNumber, title, topic, objectives }
+      );
+      if (!lesson) {
+        return sendError(res, 'Không tìm thấy buổi học trong khóa học này', 404);
+      }
+      return sendSuccess(res, lesson, 'Cập nhật buổi học thành công');
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 module.exports = new AcademicController();
