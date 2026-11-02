@@ -62,7 +62,11 @@ export default function ClassManagement() {
   const handleCreateClass = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/classes', formData);
+      await api.post('/classes', {
+        ...formData,
+        code: selectedCourse ? `${selectedCourse.code}-L${generatedClassNumber}` : '',
+        name: selectedCourse ? `${selectedCourse.name} - Lớp ${generatedClassNumber}` : ''
+      });
       setIsCreateOpen(false);
       setFormData((current) => ({
         ...current,
