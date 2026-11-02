@@ -1,5 +1,5 @@
 const { Class, ClassSession } = require('../models/Class');
-const { Lesson } = require('../models/Academic');
+const { Course, Lesson } = require('../models/Academic');
 const User = require('../models/User');
 
 class ClassService {
@@ -64,8 +64,37 @@ class ClassService {
   }
 
   async createClass(data) {
-    const newClass = new Class(data);
-    const saved = await newClass.save();
+    const course = await Course.findById(data.courseId);
+    if (!course) {
+      const error = new Error('Không tìm thấy khóa học để mở lớp');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    let saved;
+    const codePrefix = `${course.code}-L`;
+    const codePattern = new RegExp(`^${codePrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\d+)$`);
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const existingCodes = await Class.find({ code: codePattern }).distinct('code');
+      const nextNumber = existingCodes.reduce((max, code) => {
+        const suffix = Number(code.slice(codePrefix.length));
+        return Number.isInteger(suffix) ? Math.max(max, suffix) : max;
+      }, 0) + 1;
+      const classNumber = String(nextNumber).padStart(2, '0');
+
+      try {
+        saved = await Class.create({
+          ...data,
+          code: `${codePrefix}${classNumber}`,
+          name: `${course.name} - Lớp ${classNumber}`
+        });
+        break;
+      } catch (err) {
+        if (err.code !== 11000 || attempt === 4) {
+          throw err;
+        }
+      }
+    }
 
     // Generate sessions automatically if lessons exist for the course
     const lessons = await Lesson.find({ courseId: saved.courseId }).sort({ sessionNumber: 1 });

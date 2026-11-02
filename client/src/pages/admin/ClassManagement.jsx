@@ -16,8 +16,6 @@ export default function ClassManagement() {
   const [enrollStudentId, setEnrollStudentId] = useState('');
 
   const [formData, setFormData] = useState({
-    code: '',
-    name: '',
     courseId: '',
     teacherId: '',
     scheduleDescription: 'Thứ 2 - Thứ 4 (18:30 - 20:30)',
@@ -66,11 +64,32 @@ export default function ClassManagement() {
     try {
       await api.post('/classes', formData);
       setIsCreateOpen(false);
+      setFormData((current) => ({
+        ...current,
+        courseId: '',
+        teacherId: ''
+      }));
       loadData();
     } catch (err) {
       alert(err.message);
     }
   };
+
+  const selectedCourse = courses.find((course) => course._id === formData.courseId);
+  const nextClassNumber = selectedCourse
+    ? classes.reduce((max, classItem) => {
+        const course = classItem.courseId;
+        const courseId = course?._id || course;
+        if (String(courseId) !== String(selectedCourse._id)) return max;
+        const prefix = `${selectedCourse.code}-L`;
+        if (!classItem.code?.startsWith(prefix)) return max;
+        const number = Number(classItem.code.slice(prefix.length));
+        return Number.isInteger(number) ? Math.max(max, number) : max;
+      }, 0) + 1
+    : null;
+  const generatedClassNumber = nextClassNumber === null
+    ? ''
+    : String(nextClassNumber).padStart(2, '0');
 
   const handleEnrollStudent = async (e) => {
     e.preventDefault();
@@ -299,29 +318,16 @@ export default function ClassManagement() {
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Mã lớp *</label>
-              <input
-                type="text"
-                required
-                value={formData.code}
-                onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono uppercase"
-                placeholder="WEB-K02"
-              />
-            </div>
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Tên lớp hiển thị *</label>
-              <input
-                type="text"
-                required
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs"
-                placeholder="Lớp Lập trình Web Fullstack K02"
-              />
-            </div>
+          <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs">
+            <p className="font-semibold text-blue-900">Mã lớp và tên lớp được tạo tự động</p>
+            {selectedCourse ? (
+              <div className="mt-1.5 space-y-1 text-blue-800">
+                <p>Mã lớp dự kiến: <span className="font-mono font-bold">{selectedCourse.code}-L{generatedClassNumber}</span></p>
+                <p>Tên hiển thị: <span className="font-semibold">{selectedCourse.name} - Lớp {generatedClassNumber}</span></p>
+              </div>
+            ) : (
+              <p className="mt-1 text-blue-700">Chọn khóa học để xem mã lớp và tên hiển thị dự kiến.</p>
+            )}
           </div>
 
           <div>
