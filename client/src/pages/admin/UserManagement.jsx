@@ -13,10 +13,11 @@ export default function UserManagement() {
   // Modal states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isLinkOpen, setIsLinkOpen] = useState(false);
+  const [emailEdited, setEmailEdited] = useState(false);
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
-    password: '',
+    password: '123456@Abc',
     role: 'student',
     phone: '',
     specialization: '',
@@ -35,6 +36,35 @@ export default function UserManagement() {
   const [resetLoading, setResetLoading] = useState(false);
 
   const [notification, setNotification] = useState('');
+
+  const resetCreateForm = () => {
+    setEmailEdited(false);
+    setFormData({
+      fullName: '',
+      email: '',
+      password: '123456@Abc',
+      role: 'student',
+      phone: '',
+      specialization: '',
+      studentCode: '',
+      relationship: 'Mẹ'
+    });
+  };
+
+  const generateEmail = (fullName, role) => {
+    const words = fullName
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D')
+      .toLowerCase()
+      .match(/[a-z0-9]+/g) || [];
+    if (!words.length) return '';
+
+    const name = `${words.slice(0, -1).map(word => word[0]).join('')}${words[words.length - 1]}`;
+    const roleSuffix = { student: 'hv', teacher: 'gv', parent: 'ph', admin: '' }[role];
+    return roleSuffix !== undefined ? `${name}${roleSuffix}@sems.edu.vn` : '';
+  };
 
   useEffect(() => {
     fetchUsers();
@@ -57,10 +87,11 @@ export default function UserManagement() {
   const handleCreateUser = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/users', {
+      const res = await api.post('/users', {
         fullName: formData.fullName,
         email: formData.email,
         password: formData.password || '123456@Abc',
+        emailGenerated: !emailEdited,
         role: formData.role,
         phone: formData.phone,
         profileData: {
@@ -69,7 +100,8 @@ export default function UserManagement() {
         }
       });
       setIsCreateOpen(false);
-      setNotification('Tạo tài khoản thành công!');
+      resetCreateForm();
+      setNotification(`Tạo tài khoản thành công! Email: ${res.data.email} | Mật khẩu khởi tạo: ${formData.password || '123456@Abc'}`);
       fetchUsers();
     } catch (err) {
       alert(err.message);
@@ -135,7 +167,10 @@ export default function UserManagement() {
             <span>Liên Kết Phụ Huynh</span>
           </button>
           <button
-            onClick={() => setIsCreateOpen(true)}
+            onClick={() => {
+              resetCreateForm();
+              setIsCreateOpen(true);
+            }}
             className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold shadow-xs transition-colors flex items-center gap-2"
           >
             <UserPlus className="w-4 h-4" />
@@ -268,7 +303,14 @@ export default function UserManagement() {
       </div>
 
       {/* Modal: Create User */}
-      <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Thêm Người Dùng Mới">
+      <Modal
+        isOpen={isCreateOpen}
+        onClose={() => {
+          setIsCreateOpen(false);
+          resetCreateForm();
+        }}
+        title="Thêm Người Dùng Mới"
+      >
         <form onSubmit={handleCreateUser} className="space-y-4 text-xs">
           <div>
             <label className="block font-semibold text-slate-700 mb-1">Họ và tên *</label>
@@ -276,7 +318,14 @@ export default function UserManagement() {
               type="text"
               required
               value={formData.fullName}
-              onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+              onChange={(e) => {
+                const fullName = e.target.value;
+                setFormData(current => ({
+                  ...current,
+                  fullName,
+                  email: emailEdited ? current.email : generateEmail(fullName, current.role)
+                }));
+              }}
               className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-purple-500"
               placeholder="VD: Nguyễn Văn An"
             />
@@ -289,9 +338,12 @@ export default function UserManagement() {
                 type="email"
                 required
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                onChange={(e) => {
+                  setEmailEdited(true);
+                  setFormData(current => ({ ...current, email: e.target.value }));
+                }}
                 className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-purple-500"
-                placeholder="an.nguyen@sems.edu.vn"
+                placeholder="Email tự sinh theo họ tên và vai trò"
               />
             </div>
             <div>
@@ -311,7 +363,14 @@ export default function UserManagement() {
               <label className="block font-semibold text-slate-700 mb-1">Vai trò hệ thống *</label>
               <select
                 value={formData.role}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                onChange={(e) => {
+                  const role = e.target.value;
+                  setFormData(current => ({
+                    ...current,
+                    role,
+                    email: emailEdited ? current.email : generateEmail(current.fullName, role)
+                  }));
+                }}
                 className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-purple-500"
               >
                 <option value="student">Học viên (Student)</option>
@@ -361,7 +420,10 @@ export default function UserManagement() {
           <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
             <button
               type="button"
-              onClick={() => setIsCreateOpen(false)}
+              onClick={() => {
+                setIsCreateOpen(false);
+                resetCreateForm();
+              }}
               className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50"
             >
               Hủy

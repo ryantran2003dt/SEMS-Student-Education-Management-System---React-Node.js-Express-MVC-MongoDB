@@ -1,6 +1,23 @@
 const User = require('../models/User');
 const { StudentProfile, TeacherProfile, ParentProfile, ParentStudentLink } = require('../models/Profiles');
 
+function generateEmailBase(fullName, role) {
+  const words = String(fullName || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .match(/[a-z0-9]+/g) || [];
+  if (!words.length) throw new Error('Họ và tên không hợp lệ để tạo email');
+
+  const name = `${words.slice(0, -1).map(word => word[0]).join('')}${words[words.length - 1]}`;
+  const roleSuffix = { student: 'hv', teacher: 'gv', parent: 'ph', admin: '' }[role];
+  if (roleSuffix === undefined) throw new Error('Vai trò không hợp lệ để tạo email');
+
+  return `${name}${roleSuffix}`;
+}
+
 class UserService {
   async listUsers({ role, search, status, page = 1, limit = 50 }) {
     const query = {};
@@ -31,15 +48,26 @@ class UserService {
     };
   }
 
-  async createUser({ fullName, email, password, role, phone, profileData }) {
-    const existing = await User.findOne({ email });
+  async createUser({ fullName, email, password, role, phone, profileData, emailGenerated = false }) {
+    let accountEmail = email?.trim().toLowerCase();
+    if (emailGenerated || !accountEmail) {
+      const emailBase = generateEmailBase(fullName, role);
+      accountEmail = `${emailBase}@sems.edu.vn`;
+      let suffix = 2;
+      while (await User.exists({ email: accountEmail })) {
+        accountEmail = `${emailBase}${suffix}@sems.edu.vn`;
+        suffix += 1;
+      }
+    }
+
+    const existing = await User.findOne({ email: accountEmail });
     if (existing) {
-      throw new Error(`Email ${email} đã được sử dụng.`);
+      throw new Error(`Email ${accountEmail} đã được sử dụng.`);
     }
 
     const user = new User({
       fullName,
-      email,
+      email: accountEmail,
       password: password || '123456@Abc',
       role,
       phone
