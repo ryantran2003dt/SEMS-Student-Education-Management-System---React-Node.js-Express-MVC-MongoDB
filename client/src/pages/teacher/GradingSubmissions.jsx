@@ -448,8 +448,8 @@ export default function GradingSubmissions() {
 
               {activeSubmission.submittedText && (
                 <div className="p-3 rounded-xl border bg-white">
-                  <strong className="block text-slate-600 mb-1">Nội dung bài viết:</strong>
-                  <p className="text-slate-800">{activeSubmission.submittedText}</p>
+                  <strong className="block text-slate-600 mb-1">Bài làm dạng văn bản / mã nguồn:</strong>
+                  <pre className="whitespace-pre-wrap break-words font-mono text-slate-800">{activeSubmission.submittedText}</pre>
                 </div>
               )}
 

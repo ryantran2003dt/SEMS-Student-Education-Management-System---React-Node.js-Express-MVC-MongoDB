@@ -125,7 +125,7 @@ class AIService {
     topic,
     difficulty = 'Trung bình',
     questionCount = 20,
-    questionType = 'multiple_choice',
+    questionType = 'mixed',
   }) {
     const requestedQuestionCount = Math.min(
       Math.max(Math.floor(Number(questionCount) || 20), 2),
@@ -171,6 +171,17 @@ class AIService {
         error.statusCode = 502;
         throw error;
       }
+      const minimumEssayCount = questionType === 'mixed'
+        ? Math.ceil(requestedQuestionCount * 0.6)
+        : questionType === 'essay' ? requestedQuestionCount : 0;
+      const essayCount = geminiResult.questions.filter(q => q.type === 'essay').length;
+      if (essayCount < minimumEssayCount) {
+        const error = new Error(
+          `Google Gemini chỉ tạo ${essayCount}/${requestedQuestionCount} câu tự luận; cần ít nhất ${minimumEssayCount}. Vui lòng thử sinh lại.`
+        );
+        error.statusCode = 502;
+        throw error;
+      }
       return geminiResult;
     }
 
@@ -193,7 +204,7 @@ Hãy tạo một đề bài tập chuẩn mực bằng tiếng Việt cho chủ 
 Ngữ cảnh chương trình học: ${curriculumContext || 'Kiến thức cốt lõi và kỹ năng thực hành'}.
 Mức độ khó: ${difficulty} (Dễ, Trung bình, hoặc Khó).
 Số lượng câu hỏi yêu cầu: đúng ${questionCount} câu.
-Hình thức câu hỏi mong muốn: ${questionType === 'multiple_choice' ? 'Chủ yếu trắc nghiệm 4 lựa chọn (A, B, C, D)' : questionType === 'essay' ? 'Câu hỏi tự luận / giải thích / thực hành code' : 'Kết hợp trắc nghiệm khách quan và câu hỏi vận dụng tự luận'}.
+Hình thức câu hỏi mong muốn: ${questionType === 'multiple_choice' ? '100% trắc nghiệm 4 lựa chọn (A, B, C, D)' : questionType === 'essay' ? '100% câu hỏi tự luận / giải thích / thực hành code' : `Hỗn hợp nhưng tự luận phải chiếm đa số: tạo ít nhất ${Math.ceil(questionCount * 0.6)} câu tự luận và số còn lại là trắc nghiệm. Không được thay câu tự luận bằng câu trắc nghiệm.`}.
 
 Trả về ĐÚNG ĐỊNH DẠNG JSON sau (không kèm markdown format, không bọc trong \`\`\`json):
 {
@@ -505,7 +516,34 @@ Lưu ý:
       }
     ];
 
-    let selected = templates.slice(0, Math.min(questionCount, templates.length));
+    const essayTemplates = templates.filter(q => q.type === 'essay');
+    const multipleChoiceTemplates = templates.filter(q => q.type === 'multiple_choice');
+    const toEssayQuestion = (question) => ({
+      ...question,
+      questionText: `Hãy trình bày và giải thích kiến thức cần vận dụng cho mục tiêu: ${question.targetObjective || topic}.`,
+      type: 'essay',
+      options: [],
+      correctAnswer: question.explanation || question.correctAnswer
+    });
+
+    let selected;
+    if (questionType === 'multiple_choice') {
+      selected = templates.slice(0, Math.min(questionCount, templates.length));
+    } else {
+      const essayCount = questionType === 'essay'
+        ? questionCount
+        : Math.ceil(questionCount * 0.6);
+      const availableEssays = [
+        ...essayTemplates,
+        ...multipleChoiceTemplates.map(toEssayQuestion)
+      ];
+      const essays = availableEssays.slice(0, essayCount);
+      const multipleChoiceCount = questionType === 'essay' ? 0 : questionCount - essayCount;
+      selected = [
+        ...essays,
+        ...multipleChoiceTemplates.slice(0, multipleChoiceCount)
+      ];
+    }
 
     // Chuẩn hóa điểm sao cho tổng bằng 100
     const pointPerQuestion = Math.floor(100 / selected.length);

@@ -10,6 +10,7 @@ import {
   MessageSquare,
   Paperclip,
   FileText,
+  Image,
   X,
   AlertTriangle,
   Upload,
@@ -24,6 +25,7 @@ export default function TakeAssignment() {
   const [submission, setSubmission] = useState(null);
   const [answers, setAnswers] = useState({});
   const [submittedText, setSubmittedText] = useState('');
+  const [responseMode, setResponseMode] = useState('text');
   const [selectedFile, setSelectedFile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -40,6 +42,7 @@ export default function TakeAssignment() {
       if (res.data.mySubmission) {
         setSubmission(res.data.mySubmission);
         setSubmittedText(res.data.mySubmission.submittedText || '');
+        setResponseMode(res.data.mySubmission.attachmentUrl ? 'image' : 'text');
         const map = {};
         res.data.mySubmission.answers?.forEach(a => {
           map[a.questionIndex] = {
@@ -58,6 +61,8 @@ export default function TakeAssignment() {
   };
 
   const isLocked = submission && submission.status !== 'resubmit_requested';
+  const hasEssayQuestions = !assignment?.questions?.length
+    || assignment.questions.some(q => ['essay', 'short_answer', 'code'].includes(q.type));
 
   const handleSelectOption = (qIdx, opt, optIdx) => {
     if (isLocked) return;
@@ -84,8 +89,14 @@ export default function TakeAssignment() {
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (!file.type.startsWith('image/')) {
+        alert('Vui lòng chọn tệp hình ảnh');
+        e.target.value = '';
+        return;
+      }
       if (file.size > 25 * 1024 * 1024) {
         alert('Dung lượng tệp tối đa cho phép là 25MB');
+        e.target.value = '';
         return;
       }
       setSelectedFile(file);
@@ -94,6 +105,10 @@ export default function TakeAssignment() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (hasEssayQuestions && responseMode === 'image' && !selectedFile) {
+      alert('Vui lòng chọn ảnh bài làm trước khi nộp');
+      return;
+    }
     if (!window.confirm('Bạn có chắc chắn muốn nộp bài tập này?')) return;
     setSubmitting(true);
     try {
@@ -104,10 +119,10 @@ export default function TakeAssignment() {
       }));
 
       let res;
-      if (selectedFile) {
+      if (hasEssayQuestions && responseMode === 'image' && selectedFile) {
         const formData = new FormData();
         formData.append('file', selectedFile);
-        formData.append('submittedText', submittedText);
+        formData.append('submittedText', '');
         formData.append('answers', JSON.stringify(answersArray));
         res = await api.post(`/submissions/assignments/${id}`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
@@ -115,7 +130,7 @@ export default function TakeAssignment() {
       } else {
         res = await api.post(`/submissions/assignments/${id}`, {
           answers: answersArray,
-          submittedText
+          submittedText: responseMode === 'text' ? submittedText : ''
         });
       }
 
@@ -208,6 +223,12 @@ export default function TakeAssignment() {
             </a>
           </div>
         )}
+        {submission?.submittedText && (
+          <div className="mt-4 pt-3 border-t border-slate-100">
+            <strong className="block text-xs text-slate-600 mb-1">Nội dung bài làm đã nộp:</strong>
+            <pre className="whitespace-pre-wrap break-words font-mono text-xs text-slate-800">{submission.submittedText}</pre>
+          </div>
+        )}
       </div>
 
       {/* Questions Form */}
@@ -277,73 +298,99 @@ export default function TakeAssignment() {
         })}
 
         {/* Text Area & File Attachment Section */}
-        {(!submission || isResubmit) && (
+        {hasEssayQuestions && (!submission || isResubmit) && (
           <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
               <Paperclip className="w-4 h-4 text-blue-600" />
-              <span>Đính Kèm Tệp Bài Làm & Ghi Chú</span>
+              <span>Chọn cách nộp bài tự luận</span>
             </h3>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Ghi chú hoặc lời nhắn gửi giảng viên (tùy chọn)
-              </label>
-              <textarea
-                rows={2}
-                value={submittedText}
-                onChange={(e) => setSubmittedText(e.target.value)}
-                placeholder="VD: Em gửi kèm mã nguồn đồ án và slide thuyết trình..."
-                className="w-full p-3 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setResponseMode('text');
+                  setSelectedFile(null);
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+                }}
+                className={`p-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-colors ${
+                  responseMode === 'text' ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <FileText className="w-4 h-4" /> Văn bản
+              </button>
+              <button
+                type="button"
+                onClick={() => setResponseMode('image')}
+                className={`p-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-colors ${
+                  responseMode === 'image' ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <Image className="w-4 h-4" /> Hình ảnh
+              </button>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Tệp đính kèm (PDF, Word, Zip, Ảnh, Code... tối đa 25MB)
-              </label>
+            {responseMode === 'text' ? (
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Nhập nội dung bài làm hoặc mã nguồn
+                </label>
+                <textarea
+                  rows={10}
+                  value={submittedText}
+                  onChange={(e) => setSubmittedText(e.target.value)}
+                  placeholder="Nhập câu trả lời hoặc dán mã nguồn của bạn tại đây..."
+                  className="w-full p-3 rounded-xl border border-slate-200 text-xs font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Ảnh bài làm (JPG, PNG, GIF, WEBP — tối đa 25MB)
+                </label>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  className="hidden"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                />
 
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                className="hidden"
-                accept=".pdf,.doc,.docx,.zip,.rar,.png,.jpg,.jpeg,.txt,.js,.py,.html,.css"
-              />
-
-              {!selectedFile ? (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full p-4 border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-xs text-slate-500 hover:text-blue-600 transition-colors cursor-pointer bg-slate-50/50 hover:bg-blue-50/30"
-                >
-                  <Upload className="w-5 h-5 text-slate-400" />
-                  <span className="font-semibold">Nhấn để chọn tệp từ máy tính</span>
-                  <span className="text-[10px] text-slate-400">Hỗ trợ PDF, Word, Zip, Hình ảnh, Mã nguồn</span>
-                </button>
-              ) : (
-                <div className="p-3.5 rounded-xl border border-blue-200 bg-blue-50/50 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2.5">
-                    <FileText className="w-5 h-5 text-blue-600" />
-                    <div>
-                      <div className="font-semibold text-blue-950">{selectedFile.name}</div>
-                      <div className="text-[10px] text-slate-500 font-mono">
-                        {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                      </div>
-                    </div>
-                  </div>
+                {!selectedFile ? (
                   <button
                     type="button"
-                    onClick={() => {
-                      setSelectedFile(null);
-                      if (fileInputRef.current) fileInputRef.current.value = '';
-                    }}
-                    className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full p-4 border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-xs text-slate-500 hover:text-blue-600 transition-colors cursor-pointer bg-slate-50/50 hover:bg-blue-50/30"
                   >
-                    <X className="w-4 h-4" />
+                    <Upload className="w-5 h-5 text-slate-400" />
+                    <span className="font-semibold">Nhấn để chọn ảnh bài làm</span>
+                    <span className="text-[10px] text-slate-400">Chỉ chấp nhận tệp hình ảnh</span>
                   </button>
-                </div>
-              )}
-            </div>
+                ) : (
+                  <div className="p-3.5 rounded-xl border border-blue-200 bg-blue-50/50 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2.5">
+                      <Image className="w-5 h-5 text-blue-600" />
+                      <div>
+                        <div className="font-semibold text-blue-950">{selectedFile.name}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">
+                          {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedFile(null);
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                      }}
+                      className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

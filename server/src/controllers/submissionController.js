@@ -18,7 +18,7 @@ class SubmissionController {
         studentId: req.user._id,
         answers,
         submittedText,
-        attachmentUrl: req.file ? `/uploads/${req.file.filename}` : attachmentUrl
+        attachmentUrl: req.file ? `/uploads/${req.file.filename}` : attachmentUrl || null
       });
       return sendSuccess(res, submission, 'Nộp bài tập thành công');
     } catch (err) {

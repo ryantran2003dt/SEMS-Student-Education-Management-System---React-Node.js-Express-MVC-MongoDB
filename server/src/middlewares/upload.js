@@ -19,13 +19,18 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  // Allow docs, pdf, images, zip, code files
-  const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|zip|rar|txt|js|py|cpp|c|html|css/;
-  const ext = path.extname(file.originalname).toLowerCase().replace('.', '');
-  if (allowedTypes.test(ext)) {
+  const allowedImages = {
+    '.gif': 'image/gif',
+    '.jpeg': 'image/jpeg',
+    '.jpg': 'image/jpeg',
+    '.png': 'image/png',
+    '.webp': 'image/webp'
+  };
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (allowedImages[ext] === file.mimetype) {
     cb(null, true);
   } else {
-    cb(new Error('Định dạng tệp không được hỗ trợ (chỉ chấp nhận PDF, Doc, Zip, Image, Code)'), false);
+    cb(new Error('Chỉ chấp nhận tệp hình ảnh (JPG, PNG, GIF, WEBP)'), false);
   }
 };
 

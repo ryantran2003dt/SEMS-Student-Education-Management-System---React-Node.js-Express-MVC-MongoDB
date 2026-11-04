@@ -72,7 +72,15 @@ class AssignmentService {
 
   async getAssignmentById(id, requestingUser = null) {
     const assignment = await Assignment.findById(id)
-      .populate('classId', 'name code studentIds teacherId')
+      .populate({
+        path: 'classId',
+        select: 'name code studentIds teacherId courseId',
+        populate: {
+          path: 'courseId',
+          select: 'name subjectId',
+          populate: { path: 'subjectId', select: 'name code' }
+        }
+      })
       .populate('teacherId', 'fullName email phone')
       .populate('lessonId');
 

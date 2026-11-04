@@ -40,7 +40,7 @@ export default function AssignmentStudio() {
     topic: 'Kiến trúc MVC và Thiết kế Cơ sở Dữ liệu',
     difficulty: 'Trung bình',
     questionCount: 20,
-    questionType: 'multiple_choice'
+    questionType: 'mixed'
   });
 
   // Review / Edit modal
@@ -464,7 +464,7 @@ export default function AssignmentStudio() {
             >
               <option value="multiple_choice">Chủ yếu Trắc nghiệm 4 lựa chọn (A, B, C, D)</option>
               <option value="essay">Tự luận, phân tích và thực hành giải thuật</option>
-              <option value="mixed">Hỗn hợp (Trắc nghiệm khách quan + Tự luận vận dụng)</option>
+              <option value="mixed">Hỗn hợp, ưu tiên tự luận (ít nhất 60% câu tự luận)</option>
             </select>
           </div>
 
