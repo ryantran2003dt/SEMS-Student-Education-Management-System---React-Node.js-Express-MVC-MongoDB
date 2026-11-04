@@ -6,7 +6,7 @@ const Assignment = require('../models/Assignment');
 
 const GEMINI_MODEL = 'gemini-3.8-flash';
 const GEMINI_FALLBACK_MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash-lite'];
-const GEMINI_REQUEST_TIMEOUT_MS = 20000;
+const GEMINI_REQUEST_TIMEOUT_MS = 60000;
 
 class AIService {
   getEffectiveApiKey() {
@@ -79,9 +79,12 @@ class AIService {
           throw err;
         }
 
-        lastError = controller.signal.aborted
-          ? new Error(`Google Gemini ${model} không phản hồi sau ${GEMINI_REQUEST_TIMEOUT_MS / 1000} giây.`)
-          : err;
+        if (controller.signal.aborted) {
+          lastError = new Error(`Google Gemini ${model} không phản hồi sau ${GEMINI_REQUEST_TIMEOUT_MS / 1000} giây.`);
+          lastError.statusCode = 504;
+        } else {
+          lastError = err;
+        }
       } finally {
         clearTimeout(timeoutId);
       }
